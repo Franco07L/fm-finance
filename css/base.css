@@ -58,13 +58,32 @@ html, body {
   min-height: 100vh;
 }
 
-body {
-  /* leve gradiente ambiental */
+body { background: var(--bg-primary); position: relative; }
+
+/* ---- Aurora RGB animada de fondo (live) ---- */
+body::before {
+  content: ''; position: fixed; inset: -25%; z-index: -1; pointer-events: none;
   background:
-    radial-gradient(900px 500px at 80% -10%, rgba(124,111,247,0.10), transparent 60%),
-    radial-gradient(700px 500px at -10% 110%, rgba(0,212,255,0.08), transparent 60%),
-    var(--bg-primary);
-  background-attachment: fixed;
+    radial-gradient(38% 38% at 18% 28%, rgba(124,111,247,0.22), transparent 60%),
+    radial-gradient(34% 34% at 82% 18%, rgba(0,212,255,0.18), transparent 60%),
+    radial-gradient(44% 44% at 72% 82%, rgba(255,107,157,0.15), transparent 60%),
+    radial-gradient(34% 34% at 22% 86%, rgba(0,255,136,0.12), transparent 60%);
+  filter: blur(48px);
+  animation: aurora 24s ease-in-out infinite alternate;
+}
+@keyframes aurora {
+  0%   { transform: translate3d(0,0,0) scale(1) rotate(0deg); }
+  50%  { transform: translate3d(2.5%,-2.5%,0) scale(1.1) rotate(4deg); }
+  100% { transform: translate3d(-2.5%,2.5%,0) scale(1.05) rotate(-3deg); }
+}
+/* grilla sutil encima de la aurora */
+body::after {
+  content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none;
+  background-image:
+    linear-gradient(rgba(124,111,247,0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(124,111,247,0.04) 1px, transparent 1px);
+  background-size: 44px 44px;
+  mask-image: radial-gradient(circle at 50% 40%, #000 30%, transparent 80%);
 }
 
 h1, h2, h3, h4 { font-weight: 700; letter-spacing: -0.02em; }
@@ -79,12 +98,35 @@ input, select, textarea {
 
 /* Tarjeta base reutilizable */
 .card {
+  position: relative; isolation: isolate;
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
-  transition: border-color .2s, background .2s, transform .2s;
+  transition: border-color .25s, background .25s, transform .2s, box-shadow .3s;
 }
 .card:hover { border-color: var(--border-hover); background: var(--bg-card-hover); }
+
+/* Borde RGB giratorio (elegante) al pasar el mouse */
+@property --ang { syntax: '<angle>'; initial-value: 0deg; inherits: false; }
+.card::before {
+  content: ''; position: absolute; inset: 0; border-radius: inherit; padding: 1.5px;
+  background: conic-gradient(from var(--ang),
+    transparent 55%, var(--accent-cyan), var(--accent-indigo), var(--accent-pink), var(--accent-cyan), transparent 95%);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor; mask-composite: exclude;
+  opacity: 0; transition: opacity .35s; pointer-events: none; z-index: 1;
+}
+.card:hover::before { opacity: 1; animation: girarAng 3.5s linear infinite; }
+@keyframes girarAng { to { --ang: 360deg; } }
+
+/* Tilt 3D (lo controla JS con variables) */
+.tilt {
+  transform: perspective(800px) rotateX(var(--ry,0deg)) rotateY(var(--rx,0deg)) translateZ(0);
+  transform-style: preserve-3d;
+  transition: transform .25s ease, box-shadow .3s;
+}
+.tilt.tilting { transition: box-shadow .3s; }
+.tilt:hover { box-shadow: 0 18px 50px -18px rgba(0,212,255,0.45); }
 
 /* Badge ●LIVE pulsante */
 .badge-live {

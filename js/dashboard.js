@@ -88,7 +88,12 @@
     $('#txCount').textContent = `${txMes.length} este mes`;
 
     if (!txMes.length) {
-      list.innerHTML = '<div class="tx-empty">Sin transacciones este mes</div>';
+      list.innerHTML = `<div class="empty-illu">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 7l2-3h14l2 3v3H3z"/><path d="M5 10v9a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-9"/><path d="M9 13h6"/>
+        </svg>
+        <span>Sin transacciones este mes</span>
+      </div>`;
       $('#txPagina').textContent = '1 / 1';
       $('#txPrev').disabled = true; $('#txNext').disabled = true;
       return;
@@ -143,6 +148,15 @@
   // ------------------------------------------------------------
   // Metas de ahorro
   // ------------------------------------------------------------
+  function iconoMeta(nombre) {
+    const n = nombre.toLowerCase();
+    if (n.includes('laptop') || n.includes('pc') || n.includes('legion')) return '💻';
+    if (n.includes('emergencia') || n.includes('fondo')) return '🛡️';
+    if (n.includes('viaje') || n.includes('vacac')) return '✈️';
+    if (n.includes('auto') || n.includes('moto') || n.includes('carro')) return '🚗';
+    return '🎯';
+  }
+
   function renderMetas(resumen) {
     // "actual" disponible = neto acumulado de todo el historial (ingresos - gastos)
     const ahorroTotal = resumen.reduce((a, m) => a + (m.ingreso - m.gasto), 0);
@@ -153,20 +167,26 @@
       return `
         <div class="meta">
           <div class="meta-top">
-            <span>${meta.nombre}</span>
-            <span class="meta-vals">${fmtMoneda(actual)} / ${fmtMoneda(meta.objetivo)} · ${pct}%</span>
+            <span class="meta-ico">${iconoMeta(meta.nombre)}</span>
+            <span class="meta-nombre">${meta.nombre}</span>
+            <span class="meta-vals">${fmtMoneda(actual)} / ${fmtMoneda(meta.objetivo)} · <b>${pct}%</b></span>
           </div>
-          <div class="meta-bar"><div class="meta-fill" style="width:${pct}%"></div></div>
+          <div class="meta-bar"><div class="meta-fill" data-pct="${pct}" style="width:0"></div></div>
         </div>`;
     }).join('');
 
-    // dato útil: ahorro neto acumulado
     if (CONFIG.METAS.length) {
       cont.insertAdjacentHTML('beforeend',
-        `<p style="margin-top:14px;font-family:var(--font-mono);font-size:12px;color:var(--text-secondary)">
-           Ahorro neto acumulado (todo el historial): <b style="color:var(--accent-green)">${fmtMoneda(ahorroTotal)}</b>
-         </p>`);
+        `<div class="ahorro-hero">
+           <span class="label">💰 Ahorro neto acumulado</span>
+           <span class="val">${fmtMoneda(ahorroTotal)}</span>
+         </div>`);
     }
+
+    // animar barras (width 0 → pct)
+    requestAnimationFrame(() => {
+      cont.querySelectorAll('.meta-fill').forEach(f => { f.style.width = f.dataset.pct + '%'; });
+    });
   }
 
   // ------------------------------------------------------------
@@ -228,8 +248,34 @@
   });
 
   // ------------------------------------------------------------
+  // Tilt 3D (solo mouse fino, respeta reduce-motion)
+  // ------------------------------------------------------------
+  function attachTilt() {
+    if (!window.matchMedia('(hover: hover) and (pointer: fine)').matches) return;
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    document.querySelectorAll('.tilt').forEach((el) => {
+      el.addEventListener('mousemove', (e) => {
+        const r = el.getBoundingClientRect();
+        const px = (e.clientX - r.left) / r.width - 0.5;
+        const py = (e.clientY - r.top) / r.height - 0.5;
+        el.style.setProperty('--rx', (px * 9).toFixed(2) + 'deg');
+        el.style.setProperty('--ry', (-py * 9).toFixed(2) + 'deg');
+      });
+      el.addEventListener('mouseleave', () => {
+        el.style.setProperty('--rx', '0deg');
+        el.style.setProperty('--ry', '0deg');
+      });
+    });
+  }
+
+  // ------------------------------------------------------------
   // Init
   // ------------------------------------------------------------
   mesLabel.textContent = nombreMes(mesActual);
+  if (window.gsap && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    gsap.from('.kpi', { opacity: 0, y: 22, scale: 0.96, duration: 0.5, stagger: 0.06, ease: 'power2.out' });
+    gsap.from('.charts-grid, .tx-card, .metas-card', { opacity: 0, y: 28, duration: 0.55, stagger: 0.12, delay: 0.2, ease: 'power2.out' });
+  }
+  attachTilt();
   cargar();
 })();
