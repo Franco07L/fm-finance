@@ -16,6 +16,7 @@
   const btnIngreso  = $('#btnIngreso');
   const thumb       = $('#toggleThumb');
   const selCategoria = $('#selCategoria');
+  const inpOtraCategoria = $('#inpOtraCategoria');
   const inpMonto    = $('#inpMonto');
   const montoBox    = $('#montoBox');
   const inpDescripcion = $('#inpDescripcion');
@@ -41,7 +42,16 @@
       const ic = infoCategoria(c).icon;
       return `<option value="${c}">${ic}  ${c}</option>`;
     }).join('');
+    toggleOtro();
   }
+
+  // Muestra un campo para escribir la categoría cuando se elige "Otro".
+  function toggleOtro() {
+    const esOtro = selCategoria.value === 'Otro';
+    inpOtraCategoria.hidden = !esOtro;
+    if (!esOtro) inpOtraCategoria.value = '';
+  }
+  selCategoria.addEventListener('change', toggleOtro);
 
   function setTipo(tipo) {
     tipoActual = tipo;
@@ -109,9 +119,15 @@
     if (!monto || monto <= 0) { mostrarToast('Ingresa un monto válido', 'error'); inpMonto.focus(); return; }
     if (!selCategoria.value)  { mostrarToast('Elige una categoría', 'error'); return; }
 
+    let categoria = selCategoria.value;
+    if (categoria === 'Otro') {
+      const otra = inpOtraCategoria.value.trim();
+      if (otra) categoria = otra;   // categoría personalizada que escribió el usuario
+    }
+
     const tx = {
       tipo: tipoActual,
-      categoria: selCategoria.value,
+      categoria: categoria,
       subcategoria: '',
       monto,
       descripcion: inpDescripcion.value.trim(),
@@ -143,6 +159,7 @@
   function limpiarForm() {
     inpMonto.value = '';
     inpDescripcion.value = '';
+    inpOtraCategoria.value = '';
     document.querySelector('input[name="modoFecha"][value="hoy"]').checked = true;
     inpFecha.hidden = true;
     inpMonto.focus();
@@ -162,6 +179,11 @@
   function cerrarConfig() { cfgOverlay.hidden = true; }
 
   btnConfig.addEventListener('click', abrirConfig);
+
+  // Cerrar el overlay de conexión sin obligar a llenarlo: X, clic afuera o Esc.
+  document.querySelector('#btnCerrarCfg').addEventListener('click', cerrarConfig);
+  cfgOverlay.addEventListener('click', (e) => { if (e.target === cfgOverlay) cerrarConfig(); });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !cfgOverlay.hidden) cerrarConfig(); });
 
   btnGuardarCfg.addEventListener('click', async () => {
     const url = cfgUrl.value.trim();

@@ -36,6 +36,11 @@ function doPost(e) {
       return json(borrarPorId(sheet, data.id));
     }
 
+    if (accion === 'guardarMetas') {
+      PropertiesService.getScriptProperties().setProperty('METAS_JSON', JSON.stringify(data.metas || []));
+      return json({ ok: true });
+    }
+
     // accion === 'crear'
     const now = new Date();
     const fecha = data.fecha ? new Date(data.fecha) : now;
@@ -75,6 +80,8 @@ function doGet(e) {
     const action = p.action || 'read';
 
     if (action === 'summary') return json({ ok: true, data: resumen6Meses(sheet) });
+
+    if (action === 'metas') return json({ ok: true, data: leerMetasGuardadas() });
 
     // action === 'read'
     return json({ ok: true, data: leerTransacciones(sheet, p.mes) });
@@ -119,6 +126,13 @@ function borrarPorId(sheet, id) {
     }
   }
   return { ok: false, error: 'ID no encontrado' };
+}
+
+// Metas de ahorro: guardadas como JSON en Propiedades del script.
+// Devuelve null si NUNCA se han guardado (para distinguir de "lista vacía").
+function leerMetasGuardadas() {
+  const raw = PropertiesService.getScriptProperties().getProperty('METAS_JSON');
+  return raw ? JSON.parse(raw) : null;
 }
 
 // Detección de Date robusta (instanceof falla con valores de Sheets en Apps Script).

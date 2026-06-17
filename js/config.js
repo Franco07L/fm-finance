@@ -58,3 +58,23 @@ const Conexion = {
     localStorage.removeItem(this.KEY_TOKEN);
   },
 };
+
+/* ------------------------------------------------------------
+   Metas de ahorro editables — viven en localStorage (este
+   dispositivo). CONFIG.METAS es solo la semilla por defecto.
+   ------------------------------------------------------------ */
+const Metas = {
+  KEY: 'fm_metas',
+
+  get() {
+    try {
+      const r = localStorage.getItem(this.KEY);
+      if (r) return JSON.parse(r);
+    } catch (e) { /* corrupto → usa semilla */ }
+    return CONFIG.METAS.map(m => ({ ...m }));
+  },
+
+  set(arr) {
+    localStorage.setItem(this.KEY, JSON.stringify(arr || []));
+  },
+};

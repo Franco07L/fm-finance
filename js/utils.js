@@ -19,6 +19,7 @@ const CATEGORIA_CONFIG = {
   'Gaming/Ocio':        { color: '#FFB800', icon: '▼', tipo: 'gasto' },
   'Ropa/Personal':      { color: '#FFB800', icon: '▼', tipo: 'gasto' },
   'Emergencias':        { color: '#FF4444', icon: '▼', tipo: 'gasto' },
+  'Otro':               { color: '#8888AA', icon: '▼', tipo: 'gasto' },
 };
 
 /** Lista de nombres de categoría filtrada por tipo ('ingreso' | 'gasto'). */

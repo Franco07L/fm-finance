@@ -34,6 +34,11 @@ const Sheets = {
   crear(tx)  { return this._post(Object.assign({ accion: 'crear' }, tx)); },
   borrar(id) { return this._post({ accion: 'borrar', id }); },
 
+  // Metas de ahorro (sincronizadas entre dispositivos).
+  // leerMetas devuelve el array, o null si nunca se han guardado en el backend.
+  leerMetas()       { return this._get({ action: 'metas' }); },
+  guardarMetas(arr) { return this._post({ accion: 'guardarMetas', metas: arr }); },
+
   /** Prueba la conexión (URL+token) leyendo. Lanza error si falla. */
   async probar() { await this.leer(); return true; },
 };

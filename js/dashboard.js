@@ -11,6 +11,8 @@
   let mesActual = mesActualYYYYMM();
   let txMes = [];          // transacciones del mes seleccionado
   let pagina = 1;
+  let metas = Metas.get();   // metas de ahorro (localStorage, editables)
+  let ultimoResumen = null;  // último resumen cargado (para re-render de metas)
 
   // --- Refs ---
   const mesLabel = $('#mesLabel');
@@ -23,9 +25,14 @@
     if (!Conexion.configurada()) { abrirConfig(); return; }
     loading.hidden = false;
     try {
-      const [txs, resumen] = await Promise.all([Sheets.leer(mesActual), Sheets.resumen()]);
+      const [txs, resumen, serverMetas] = await Promise.all([
+        Sheets.leer(mesActual),
+        Sheets.resumen(),
+        Sheets.leerMetas().catch(() => undefined), // undefined=sin red; null=backend vacío; array=datos
+      ]);
       txMes = txs;
       pagina = 1;
+      await sincronizarMetas(serverMetas);
       renderKPIs(txs);
       renderAlertas(txs);
       Charts.renderDonut($('#chartDonut'), gastosPorCategoria(txs));
@@ -37,6 +44,36 @@
     } finally {
       loading.hidden = true;
     }
+  }
+
+  const PEND_METAS = 'fm_metas_pendiente';
+
+  // Reconcilia metas locales <-> backend (backend = fuente de verdad).
+  async function sincronizarMetas(serverMetas) {
+    if (localStorage.getItem(PEND_METAS)) {
+      // hay cambios locales sin subir → empujarlos primero
+      try { await Sheets.guardarMetas(metas); localStorage.removeItem(PEND_METAS); } catch (e) { /* sigue offline */ }
+      return;
+    }
+    if (serverMetas === undefined) return;              // sin red → conserva las locales
+    if (serverMetas === null) {                         // backend nunca tuvo metas → sembrar con las locales
+      if (metas.length) { try { await Sheets.guardarMetas(metas); } catch (e) { /* reintenta luego */ } }
+      return;
+    }
+    // adoptar backend solo si tiene forma de metas (protege de respuestas inesperadas)
+    if (Array.isArray(serverMetas) && serverMetas.every(esMetaValida)) {
+      metas = serverMetas; Metas.set(metas);
+    }
+  }
+
+  function esMetaValida(m) {
+    return m && typeof m === 'object' && 'nombre' in m && 'objetivo' in m;
+  }
+
+  // Empuja las metas al backend; marca pendiente si no hay red.
+  async function pushMetas() {
+    try { await Sheets.guardarMetas(metas); localStorage.removeItem(PEND_METAS); return true; }
+    catch (e) { localStorage.setItem(PEND_METAS, '1'); return false; }
   }
 
   // ------------------------------------------------------------
@@ -158,24 +195,32 @@
   }
 
   function renderMetas(resumen) {
-    // "actual" disponible = neto acumulado de todo el historial (ingresos - gastos)
-    const ahorroTotal = resumen.reduce((a, m) => a + (m.ingreso - m.gasto), 0);
+    if (resumen) ultimoResumen = resumen;
+    // "Ahorro neto acumulado" = neto de todo el historial (ingresos - gastos)
+    const ahorroTotal = (resumen || []).reduce((a, m) => a + (m.ingreso - m.gasto), 0);
     const cont = $('#metasList');
-    cont.innerHTML = CONFIG.METAS.map(meta => {
+
+    if (!metas.length) {
+      cont.innerHTML = `<div class="meta-empty">Aún no tienes metas. Pulsa “+ Meta” para crear una.</div>`;
+      return;
+    }
+
+    cont.innerHTML = metas.map((meta, i) => {
       const actual = meta.actual || 0;
-      const pct = Math.min(100, Math.round((actual / meta.objetivo) * 100));
+      const pct = meta.objetivo > 0 ? Math.min(100, Math.round((actual / meta.objetivo) * 100)) : 0;
       return `
-        <div class="meta">
+        <div class="meta" data-i="${i}">
           <div class="meta-top">
             <span class="meta-ico">${iconoMeta(meta.nombre)}</span>
             <span class="meta-nombre">${meta.nombre}</span>
             <span class="meta-vals">${fmtMoneda(actual)} / ${fmtMoneda(meta.objetivo)} · <b>${pct}%</b></span>
+            <button class="meta-edit" data-edit="${i}" title="Editar meta" aria-label="Editar meta">✎</button>
           </div>
           <div class="meta-bar"><div class="meta-fill" data-pct="${pct}" style="width:0"></div></div>
         </div>`;
     }).join('');
 
-    if (CONFIG.METAS.length) {
+    if (resumen) {
       cont.insertAdjacentHTML('beforeend',
         `<div class="ahorro-hero">
            <span class="label">💰 Ahorro neto acumulado</span>
@@ -183,11 +228,65 @@
          </div>`);
     }
 
-    // animar barras (width 0 → pct)
+    cont.querySelectorAll('.meta-edit').forEach(b =>
+      b.addEventListener('click', () => abrirMetaEditor(+b.dataset.edit)));
+
     requestAnimationFrame(() => {
       cont.querySelectorAll('.meta-fill').forEach(f => { f.style.width = f.dataset.pct + '%'; });
     });
   }
+
+  // ------------------------------------------------------------
+  // Editor de metas (añadir / editar / eliminar) — guardado local
+  // ------------------------------------------------------------
+  const metaOverlay = $('#metaOverlay');
+  let metaEditIndex = null;
+
+  function abrirMetaEditor(i) {
+    metaEditIndex = (typeof i === 'number') ? i : null;
+    const m = metaEditIndex !== null ? metas[metaEditIndex] : { nombre: '', objetivo: '', actual: '' };
+    $('#metaTitle').textContent = metaEditIndex !== null ? 'Editar meta' : 'Nueva meta';
+    $('#metaNombre').value = m.nombre || '';
+    $('#metaObjetivo').value = m.objetivo || '';
+    $('#metaActual').value = m.actual || '';
+    $('#metaEstado').textContent = ''; $('#metaEstado').className = 'cfg-estado';
+    $('#metaEliminar').hidden = metaEditIndex === null;
+    metaOverlay.hidden = false;
+    $('#metaNombre').focus();
+  }
+  function cerrarMetaEditor() { metaOverlay.hidden = true; }
+
+  async function guardarMeta() {
+    const nombre = $('#metaNombre').value.trim();
+    const objetivo = parseMonto($('#metaObjetivo').value);
+    const actual = parseMonto($('#metaActual').value);
+    if (!nombre) { $('#metaEstado').textContent = 'Ponle un nombre a la meta'; $('#metaEstado').className = 'cfg-estado error'; return; }
+    if (!objetivo || objetivo <= 0) { $('#metaEstado').textContent = 'El objetivo debe ser mayor a 0'; $('#metaEstado').className = 'cfg-estado error'; return; }
+    const meta = { nombre, objetivo, actual: actual || 0 };
+    if (metaEditIndex !== null) metas[metaEditIndex] = meta; else metas.push(meta);
+    Metas.set(metas);
+    cerrarMetaEditor();
+    renderMetas(ultimoResumen);
+    const ok = await pushMetas();
+    mostrarToast(ok ? '✓ Meta guardada' : '✓ Guardada (offline; se sincroniza al reconectar)', 'ok');
+  }
+  async function eliminarMeta() {
+    if (metaEditIndex === null) return;
+    const m = metas[metaEditIndex];
+    if (!confirm(`¿Eliminar la meta "${m.nombre}"?`)) return;
+    metas.splice(metaEditIndex, 1);
+    Metas.set(metas);
+    cerrarMetaEditor();
+    renderMetas(ultimoResumen);
+    const ok = await pushMetas();
+    mostrarToast(ok ? 'Meta eliminada' : 'Eliminada (offline; se sincroniza al reconectar)', 'ok');
+  }
+
+  $('#btnAddMeta').addEventListener('click', () => abrirMetaEditor(null));
+  $('#metaGuardar').addEventListener('click', guardarMeta);
+  $('#metaEliminar').addEventListener('click', eliminarMeta);
+  $('#metaClose').addEventListener('click', cerrarMetaEditor);
+  metaOverlay.addEventListener('click', (e) => { if (e.target === metaOverlay) cerrarMetaEditor(); });
 
   // ------------------------------------------------------------
   // Helpers
@@ -232,6 +331,14 @@
     $('#cfgOverlay').hidden = false;
   }
   $('#btnConfig').addEventListener('click', abrirConfig);
+  // Cerrar overlays sin obligar a llenarlos: X, clic afuera o Esc.
+  $('#btnCerrarCfg').addEventListener('click', () => { $('#cfgOverlay').hidden = true; });
+  $('#cfgOverlay').addEventListener('click', (e) => { if (e.target === $('#cfgOverlay')) $('#cfgOverlay').hidden = true; });
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape') return;
+    if (!metaOverlay.hidden) cerrarMetaEditor();
+    else if (!$('#cfgOverlay').hidden) $('#cfgOverlay').hidden = true;
+  });
   $('#btnGuardarCfg').addEventListener('click', async () => {
     const url = $('#cfgUrl').value.trim(), token = $('#cfgToken').value.trim();
     if (!url || !token) { $('#cfgEstado').textContent = 'Completa URL y token'; $('#cfgEstado').className = 'cfg-estado error'; return; }
@@ -277,5 +384,6 @@
     gsap.from('.charts-grid, .tx-card, .metas-card', { opacity: 0, y: 28, duration: 0.55, stagger: 0.12, delay: 0.2, ease: 'power2.out' });
   }
   attachTilt();
+  renderMetas(null);   // las metas son locales: se ven aunque no haya conexión
   cargar();
 })();

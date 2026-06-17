@@ -19,6 +19,7 @@
   <!-- Overlay de configuración (igual que el form) -->
   <div class="cfg-overlay" id="cfgOverlay" hidden>
     <div class="cfg-card">
+      <button class="cfg-x" id="btnCerrarCfg" type="button" aria-label="Cerrar" title="Cerrar">✕</button>
       <h2>Conectar tu cuenta</h2>
       <p class="cfg-help">Pega la <b>URL</b> de tu Apps Script y tu <b>token</b>. Se guardan solo en este dispositivo.</p>
       <label>URL de la app web (termina en <span class="mono">/exec</span>)</label>
@@ -104,13 +105,33 @@
 
     <!-- Metas -->
     <section class="card metas-card">
-      <h3>Metas de ahorro</h3>
+      <div class="metas-head">
+        <h3>Metas de ahorro</h3>
+        <button class="btn-meta-add" id="btnAddMeta" type="button">+ Meta</button>
+      </div>
       <div id="metasList"></div>
     </section>
 
   </main>
 
   <div class="loading-overlay" id="loading" hidden><div class="spinner"></div></div>
+
+  <!-- Editor de metas de ahorro -->
+  <div class="cfg-overlay" id="metaOverlay" hidden>
+    <div class="cfg-card">
+      <button class="cfg-x" id="metaClose" type="button" aria-label="Cerrar" title="Cerrar">✕</button>
+      <h2 id="metaTitle">Nueva meta</h2>
+      <label>Nombre de la meta</label>
+      <input type="text" id="metaNombre" class="inp" placeholder="Ej. Laptop Legion Pro" autocomplete="off">
+      <label>Objetivo (S/)</label>
+      <input type="text" id="metaObjetivo" class="inp mono" inputmode="decimal" placeholder="3500" autocomplete="off">
+      <label>Ahorrado hasta ahora (S/)</label>
+      <input type="text" id="metaActual" class="inp mono" inputmode="decimal" placeholder="0" autocomplete="off">
+      <button class="btn-primary" id="metaGuardar" type="button">Guardar meta</button>
+      <button class="meta-eliminar" id="metaEliminar" type="button" hidden>🗑 Eliminar meta</button>
+      <p class="cfg-estado" id="metaEstado"></p>
+    </div>
+  </div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>

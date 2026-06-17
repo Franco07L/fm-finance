@@ -19,6 +19,7 @@
   <!-- Overlay de configuración (se muestra si no hay URL+token guardados) -->
   <div class="cfg-overlay" id="cfgOverlay" hidden>
     <div class="cfg-card">
+      <button class="cfg-x" id="btnCerrarCfg" type="button" aria-label="Cerrar" title="Cerrar">✕</button>
       <h2>Conectar tu cuenta</h2>
       <p class="cfg-help">Pega la <b>URL</b> de tu Apps Script y tu <b>token</b>. Se guardan solo en este dispositivo.</p>
       <label>URL de la app web (termina en <span class="mono">/exec</span>)</label>
@@ -63,6 +64,7 @@
       <!-- Categoría -->
       <label class="field-label">Categoría</label>
       <select id="selCategoria" class="inp"></select>
+      <input type="text" id="inpOtraCategoria" class="inp" placeholder="¿Qué categoría? Ej. Mascota" autocomplete="off" hidden>
 
       <!-- Descripción -->
       <label class="field-label">Descripción <span class="opt">(opcional)</span></label>
