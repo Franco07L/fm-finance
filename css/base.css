@@ -1,0 +1,130 @@
+/* ============================================================
+   FM_FINANCE — base.css
+   Variables de diseño + reset + utilidades compartidas
+   ============================================================ */
+
+:root {
+  /* Fondos */
+  --bg-primary:    #08080F;
+  --bg-secondary:  #0D0D1A;
+  --bg-card:       #111122;
+  --bg-card-hover: #161630;
+
+  /* Acentos */
+  --accent-cyan:   #00D4FF;
+  --accent-indigo: #7C6FF7;
+  --accent-pink:   #FF6B9D;
+  --accent-green:  #00FF88;
+  --accent-amber:  #FFB800;
+  --accent-red:    #FF4444;
+
+  /* Texto */
+  --text-primary:  #F0F0FF;
+  --text-secondary:#8888AA;
+  --text-muted:    #444466;
+
+  /* Bordes / glows */
+  --border:        rgba(124,111,247,0.2);
+  --border-hover:  rgba(0,212,255,0.4);
+  --glow-cyan:     0 0 20px rgba(0,212,255,0.3);
+  --glow-indigo:   0 0 20px rgba(124,111,247,0.3);
+  --glow-pink:     0 0 20px rgba(255,107,157,0.3);
+
+  /* Tipografía */
+  --font-display:  'Space Grotesk', sans-serif;
+  --font-mono:     'JetBrains Mono', monospace;
+
+  /* Radios */
+  --radius-sm: 6px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+
+  /* Espaciado base */
+  --sp-1: 4px;  --sp-2: 8px;  --sp-3: 12px;
+  --sp-4: 16px; --sp-5: 24px; --sp-6: 32px;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+/* El atributo [hidden] debe ganar siempre (si no, un display:flex/grid lo anula) */
+[hidden] { display: none !important; }
+
+html, body {
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: var(--font-display);
+  -webkit-font-smoothing: antialiased;
+  min-height: 100vh;
+}
+
+body {
+  /* leve gradiente ambiental */
+  background:
+    radial-gradient(900px 500px at 80% -10%, rgba(124,111,247,0.10), transparent 60%),
+    radial-gradient(700px 500px at -10% 110%, rgba(0,212,255,0.08), transparent 60%),
+    var(--bg-primary);
+  background-attachment: fixed;
+}
+
+h1, h2, h3, h4 { font-weight: 700; letter-spacing: -0.02em; }
+
+button { font-family: var(--font-display); cursor: pointer; border: none; }
+input, select, textarea {
+  font-family: var(--font-display);
+  color: var(--text-primary);
+}
+
+.mono { font-family: var(--font-mono); }
+
+/* Tarjeta base reutilizable */
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  transition: border-color .2s, background .2s, transform .2s;
+}
+.card:hover { border-color: var(--border-hover); background: var(--bg-card-hover); }
+
+/* Badge ●LIVE pulsante */
+.badge-live {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-family: var(--font-mono); font-size: 11px;
+  color: var(--accent-cyan); letter-spacing: 0.08em;
+}
+.badge-live .dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--accent-cyan); box-shadow: var(--glow-cyan);
+  animation: pulse 1.6s ease-in-out infinite;
+}
+@keyframes pulse {
+  0%, 100% { opacity: 1;   transform: scale(1); }
+  50%      { opacity: .4;  transform: scale(0.75); }
+}
+
+/* Chips de monto */
+.monto-ingreso { color: var(--accent-green); }
+.monto-gasto   { color: var(--accent-pink); }
+
+/* Toast (form y dashboard) */
+.toast {
+  position: fixed; top: 16px; left: 50%; transform: translateX(-50%) translateY(-120%);
+  z-index: 9999;
+  padding: 12px 20px; border-radius: var(--radius-md);
+  font-family: var(--font-mono); font-size: 14px; font-weight: 600;
+  border: 1px solid var(--border); background: var(--bg-card);
+  box-shadow: 0 8px 30px rgba(0,0,0,0.5);
+  pointer-events: none;
+}
+.toast.ok    { color: var(--accent-green); border-color: rgba(0,255,136,0.4); }
+.toast.error { color: var(--accent-red);   border-color: rgba(255,68,68,0.4); }
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+
+/* Accesibilidad: respeta usuarios que prefieren menos movimiento */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+}

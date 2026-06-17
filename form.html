@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#7C6FF7">
+  <title>FM Finance — Registrar</title>
+
+  <link rel="manifest" href="manifest.json">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/form.css">
+</head>
+<body>
+
+  <!-- Overlay de configuración (se muestra si no hay URL+token guardados) -->
+  <div class="cfg-overlay" id="cfgOverlay" hidden>
+    <div class="cfg-card">
+      <h2>Conectar tu cuenta</h2>
+      <p class="cfg-help">Pega la <b>URL</b> de tu Apps Script y tu <b>token</b>. Se guardan solo en este dispositivo.</p>
+      <label>URL de la app web (termina en <span class="mono">/exec</span>)</label>
+      <input type="text" id="cfgUrl" class="inp" placeholder="https://script.google.com/macros/s/.../exec" autocomplete="off">
+      <label>Token</label>
+      <input type="text" id="cfgToken" class="inp" placeholder="fm_..." autocomplete="off">
+      <button class="btn-primary" id="btnGuardarCfg">Conectar</button>
+      <p class="cfg-estado" id="cfgEstado"></p>
+    </div>
+  </div>
+
+  <header class="app-header">
+    <div class="brand">
+      <span class="logo">FM</span>
+      <span class="title">Finance</span>
+    </div>
+    <div class="header-right">
+      <span class="badge-live"><span class="dot"></span>LIVE</span>
+      <a href="index.html" class="icon-btn" title="Dashboard" aria-label="Dashboard">▦</a>
+      <button class="icon-btn" id="btnConfig" title="Configuración" aria-label="Configuración">⚙</button>
+    </div>
+  </header>
+
+  <main class="form-wrap">
+    <form class="form-card card" id="formTx" autocomplete="off">
+
+      <!-- Toggle Ingreso / Gasto -->
+      <div class="toggle" role="tablist">
+        <button type="button" class="toggle-btn" data-tipo="gasto"   id="btnGasto">▼ GASTO</button>
+        <button type="button" class="toggle-btn" data-tipo="ingreso" id="btnIngreso">▲ INGRESO</button>
+        <span class="toggle-thumb" id="toggleThumb"></span>
+      </div>
+
+      <!-- Monto -->
+      <label class="field-label">Monto</label>
+      <div class="monto-box" id="montoBox">
+        <span class="moneda">S/</span>
+        <input type="text" id="inpMonto" class="monto-input mono" inputmode="decimal"
+               placeholder="0.00" aria-label="Monto">
+      </div>
+
+      <!-- Categoría -->
+      <label class="field-label">Categoría</label>
+      <select id="selCategoria" class="inp"></select>
+
+      <!-- Descripción -->
+      <label class="field-label">Descripción <span class="opt">(opcional)</span></label>
+      <textarea id="inpDescripcion" class="inp" rows="2" placeholder="Ej. Almuerzo en la U"></textarea>
+
+      <!-- Fecha -->
+      <label class="field-label">Fecha</label>
+      <div class="fecha-row">
+        <label class="radio-pill">
+          <input type="radio" name="modoFecha" value="hoy" checked> Hoy
+        </label>
+        <label class="radio-pill">
+          <input type="radio" name="modoFecha" value="otra"> Otra fecha
+        </label>
+        <input type="date" id="inpFecha" class="inp inp-fecha" hidden>
+      </div>
+
+      <button type="submit" class="btn-registrar" id="btnRegistrar">+ REGISTRAR</button>
+    </form>
+
+    <!-- Badge de pendientes offline -->
+    <div class="cola-badge" id="colaBadge" hidden>📶 <span id="colaCount">0</span> pendiente(s)</div>
+  </main>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/utils.js"></script>
+  <script src="js/sheets.js"></script>
+  <script src="js/form.js"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+    }
+  </script>
+</body>
+</html>

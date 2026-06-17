@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#7C6FF7">
+  <title>FM Finance — Dashboard</title>
+
+  <link rel="manifest" href="manifest.json">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/dashboard.css">
+</head>
+<body>
+
+  <!-- Overlay de configuración (igual que el form) -->
+  <div class="cfg-overlay" id="cfgOverlay" hidden>
+    <div class="cfg-card">
+      <h2>Conectar tu cuenta</h2>
+      <p class="cfg-help">Pega la <b>URL</b> de tu Apps Script y tu <b>token</b>. Se guardan solo en este dispositivo.</p>
+      <label>URL de la app web (termina en <span class="mono">/exec</span>)</label>
+      <input type="text" id="cfgUrl" class="inp" placeholder="https://script.google.com/macros/s/.../exec" autocomplete="off">
+      <label>Token</label>
+      <input type="text" id="cfgToken" class="inp" placeholder="fm_..." autocomplete="off">
+      <button class="btn-primary" id="btnGuardarCfg">Conectar</button>
+      <p class="cfg-estado" id="cfgEstado"></p>
+    </div>
+  </div>
+
+  <header class="dash-header">
+    <div class="brand">
+      <span class="logo">FM</span>
+      <span class="title">Finance</span>
+    </div>
+    <div class="header-center">
+      <button class="month-nav" id="mesPrev" aria-label="Mes anterior">‹</button>
+      <span class="month-label" id="mesLabel">—</span>
+      <button class="month-nav" id="mesNext" aria-label="Mes siguiente">›</button>
+    </div>
+    <div class="header-right">
+      <a href="form.html" class="btn-add">+ Registrar</a>
+      <button class="icon-btn" id="btnRefresh" title="Actualizar" aria-label="Actualizar">↻</button>
+      <button class="icon-btn" id="btnConfig" title="Configuración" aria-label="Configuración">⚙</button>
+    </div>
+  </header>
+
+  <main class="dash-main" id="dashMain">
+
+    <!-- KPIs -->
+    <section class="kpi-grid">
+      <div class="card kpi"><span class="kpi-label">Ingresos</span><span class="kpi-val mono" id="kpiIngresos" data-color="green">S/ 0</span></div>
+      <div class="card kpi"><span class="kpi-label">Gastos</span><span class="kpi-val mono" id="kpiGastos" data-color="pink">S/ 0</span></div>
+      <div class="card kpi"><span class="kpi-label">Neto</span><span class="kpi-val mono" id="kpiNeto">S/ 0</span></div>
+      <div class="card kpi"><span class="kpi-label">Disponible / día</span><span class="kpi-val mono" id="kpiPorDia" data-color="cyan">S/ 0</span></div>
+      <div class="card kpi"><span class="kpi-label">Días restantes</span><span class="kpi-val mono" id="kpiDias">0</span></div>
+    </section>
+
+    <!-- Alertas de presupuesto -->
+    <section id="alertas" class="alertas" hidden></section>
+
+    <!-- Gráficos -->
+    <section class="charts-grid">
+      <div class="card chart-card">
+        <h3>Gastos por categoría</h3>
+        <div class="chart-box"><canvas id="chartDonut"></canvas></div>
+      </div>
+      <div class="card chart-card">
+        <h3>Ingresos vs Gastos · 6 meses</h3>
+        <div class="chart-box"><canvas id="chartBar"></canvas></div>
+      </div>
+    </section>
+
+    <!-- Transacciones -->
+    <section class="card tx-card">
+      <div class="tx-head">
+        <h3>Transacciones</h3>
+        <span class="tx-count mono" id="txCount"></span>
+      </div>
+      <div id="txList" class="tx-list"></div>
+      <div class="tx-pager">
+        <button class="pager-btn" id="txPrev">‹ Anterior</button>
+        <span class="mono" id="txPagina">1 / 1</span>
+        <button class="pager-btn" id="txNext">Siguiente ›</button>
+      </div>
+    </section>
+
+    <!-- Metas -->
+    <section class="card metas-card">
+      <h3>Metas de ahorro</h3>
+      <div id="metasList"></div>
+    </section>
+
+  </main>
+
+  <div class="loading-overlay" id="loading" hidden><div class="spinner"></div></div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/utils.js"></script>
+  <script src="js/sheets.js"></script>
+  <script src="js/charts.js"></script>
+  <script src="js/dashboard.js"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+    }
+  </script>
+</body>
+</html>

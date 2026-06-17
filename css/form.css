@@ -1,0 +1,142 @@
+/* ============================================================
+   FM_FINANCE — form.css  (mobile-first, uso a una mano)
+   ============================================================ */
+
+.form-wrap {
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 16px;
+}
+
+/* ---------- Header ---------- */
+.app-header {
+  position: sticky; top: 0; z-index: 10;
+  height: 52px;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 16px;
+  background: rgba(8,8,15,0.85);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border);
+}
+.brand { display: flex; align-items: center; gap: 8px; }
+.brand .logo {
+  font-weight: 700; font-size: 18px;
+  background: linear-gradient(135deg, var(--accent-cyan), var(--accent-indigo));
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.brand .title { font-weight: 500; color: var(--text-secondary); font-size: 15px; }
+.header-right { display: flex; align-items: center; gap: 10px; }
+.icon-btn {
+  width: 34px; height: 34px; display: grid; place-items: center;
+  border-radius: var(--radius-sm); background: var(--bg-card);
+  border: 1px solid var(--border); color: var(--text-primary);
+  font-size: 15px; text-decoration: none; transition: border-color .2s, background .2s;
+}
+.icon-btn:hover { border-color: var(--border-hover); background: var(--bg-card-hover); }
+
+/* ---------- Form card ---------- */
+.form-card { padding: 20px; margin-top: 16px; display: flex; flex-direction: column; gap: 6px; }
+
+.field-label {
+  font-family: var(--font-mono); font-size: 12px; color: var(--text-secondary);
+  text-transform: uppercase; letter-spacing: 0.06em; margin-top: 12px; margin-bottom: 4px;
+}
+.field-label .opt { text-transform: none; color: var(--text-muted); letter-spacing: 0; }
+
+.inp {
+  width: 100%; padding: 13px 14px;
+  background: var(--bg-secondary); border: 1px solid var(--border);
+  border-radius: var(--radius-md); color: var(--text-primary); font-size: 15px;
+  transition: border-color .2s, box-shadow .2s;
+}
+.inp:focus { outline: none; border-color: var(--accent-cyan); box-shadow: var(--glow-cyan); }
+textarea.inp { resize: vertical; min-height: 48px; }
+select.inp { appearance: none; cursor: pointer; }
+
+/* ---------- Toggle Ingreso/Gasto ---------- */
+.toggle {
+  position: relative; display: grid; grid-template-columns: 1fr 1fr;
+  background: var(--bg-secondary); border: 1px solid var(--border);
+  border-radius: var(--radius-md); padding: 4px; margin-bottom: 4px;
+}
+.toggle-btn {
+  position: relative; z-index: 2; background: transparent; color: var(--text-secondary);
+  padding: 12px 0; font-weight: 700; font-size: 14px; letter-spacing: 0.04em;
+  transition: color .25s;
+}
+.toggle-btn.active { color: var(--bg-primary); }
+.toggle-thumb {
+  position: absolute; z-index: 1; top: 4px; bottom: 4px; left: 4px;
+  width: calc(50% - 4px); border-radius: 9px;
+  background: var(--accent-pink); box-shadow: var(--glow-pink);
+  transition: transform .28s cubic-bezier(.4,0,.2,1), background .28s, box-shadow .28s;
+}
+.toggle-thumb.ingreso { transform: translateX(100%); background: var(--accent-cyan); box-shadow: var(--glow-cyan); }
+
+/* ---------- Monto ---------- */
+.monto-box {
+  display: flex; align-items: center; gap: 8px;
+  background: var(--bg-secondary); border: 1px solid var(--border);
+  border-radius: var(--radius-md); padding: 8px 14px;
+  transition: border-color .2s, box-shadow .2s;
+}
+.monto-box.focus { border-color: var(--accent-cyan); box-shadow: var(--glow-cyan); }
+.monto-box .moneda { font-family: var(--font-mono); color: var(--text-secondary); font-size: 22px; }
+.monto-input {
+  flex: 1; background: transparent; border: none; outline: none;
+  font-size: 32px; font-weight: 700; color: var(--text-primary);
+}
+.monto-input::placeholder { color: var(--text-muted); }
+
+/* ---------- Fecha ---------- */
+.fecha-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.radio-pill {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 9px 14px; border-radius: 999px; cursor: pointer;
+  background: var(--bg-secondary); border: 1px solid var(--border);
+  font-size: 14px; color: var(--text-secondary); transition: all .2s;
+}
+.radio-pill:has(input:checked) { border-color: var(--accent-indigo); color: var(--text-primary); background: var(--bg-card-hover); }
+.radio-pill input { accent-color: var(--accent-indigo); }
+.inp-fecha { flex-basis: 100%; }
+
+/* ---------- Botón registrar ---------- */
+.btn-registrar {
+  margin-top: 22px; width: 100%; height: 56px;
+  border-radius: var(--radius-md); font-size: 17px; font-weight: 700; letter-spacing: 0.04em;
+  color: #fff; background: linear-gradient(135deg, var(--accent-indigo), #5a4ee0);
+  box-shadow: var(--glow-indigo); transition: transform .12s, opacity .2s;
+}
+.btn-registrar:active { transform: scale(0.98); }
+.btn-registrar:disabled { opacity: .55; cursor: not-allowed; }
+
+/* ---------- Cola offline ---------- */
+.cola-badge {
+  margin: 14px auto 0; width: fit-content;
+  font-family: var(--font-mono); font-size: 13px; color: var(--accent-amber);
+  background: rgba(255,184,0,0.08); border: 1px solid rgba(255,184,0,0.3);
+  padding: 6px 14px; border-radius: 999px;
+}
+
+/* ---------- Overlay configuración ---------- */
+.cfg-overlay {
+  position: fixed; inset: 0; z-index: 100;
+  background: rgba(8,8,15,0.92); backdrop-filter: blur(6px);
+  display: grid; place-items: center; padding: 20px;
+}
+.cfg-card {
+  width: 100%; max-width: 420px; background: var(--bg-card);
+  border: 1px solid var(--border); border-radius: var(--radius-lg);
+  padding: 24px; display: flex; flex-direction: column; gap: 8px;
+}
+.cfg-card h2 { font-size: 20px; }
+.cfg-help { color: var(--text-secondary); font-size: 14px; margin-bottom: 8px; line-height: 1.5; }
+.cfg-card label { font-family: var(--font-mono); font-size: 12px; color: var(--text-secondary); margin-top: 8px; }
+.btn-primary {
+  margin-top: 16px; height: 48px; border-radius: var(--radius-md);
+  font-weight: 700; color: #fff; background: linear-gradient(135deg, var(--accent-cyan), var(--accent-indigo));
+}
+.btn-primary:disabled { opacity: .55; }
+.cfg-estado { font-family: var(--font-mono); font-size: 13px; min-height: 18px; margin-top: 8px; }
+.cfg-estado.ok { color: var(--accent-green); }
+.cfg-estado.error { color: var(--accent-red); }
