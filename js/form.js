@@ -113,7 +113,7 @@
   // ------------------------------------------------------------
   // Submit
   // ------------------------------------------------------------
-  formTx.addEventListener('submit', async (e) => {
+  formTx.addEventListener('submit', (e) => {
     e.preventDefault();
     const monto = parseMonto(inpMonto.value);
     if (!monto || monto <= 0) { mostrarToast('Ingresa un monto válido', 'error'); inpMonto.focus(); return; }
@@ -136,24 +136,22 @@
     const fecha = fechaParaEnviar();
     if (fecha) tx.fecha = fecha;
 
-    btnRegistrar.disabled = true;
-    btnRegistrar.textContent = 'Enviando…';
+    // UI optimista: Apps Script (cuenta gratuita) puede tardar de 2 a 30+
+    // segundos en confirmar un registro (medido). No tiene sentido bloquear
+    // al usuario esperando eso — se muestra "Registrado" YA y el form se
+    // limpia al instante; el envío real ocurre en segundo plano. Si de
+    // verdad falla, cae a la misma cola offline que ya existía para cuando
+    // no hay conexión (se reintenta sola más adelante).
+    mostrarToast('✓ Registrado', 'ok');
+    limpiarForm();
 
-    try {
-      await Sheets.crear(tx);
-      mostrarToast('✓ Registrado', 'ok');
-      limpiarForm();
-      intentarVaciarCola(); // por si había pendientes
-    } catch (err) {
-      // Sin internet o error → guarda offline
-      Cola.agregar(tx);
-      refrescarColaBadge();
-      mostrarToast('✗ Sin conexión — guardado offline', 'error');
-      limpiarForm();
-    } finally {
-      btnRegistrar.disabled = false;
-      btnRegistrar.textContent = '+ REGISTRAR';
-    }
+    Sheets.crear(tx)
+      .then(() => intentarVaciarCola()) // por si había pendientes de antes
+      .catch(() => {
+        Cola.agregar(tx);
+        refrescarColaBadge();
+        mostrarToast('⚠ No se pudo confirmar — se reintentará solo', 'error');
+      });
   });
 
   function limpiarForm() {

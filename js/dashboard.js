@@ -263,17 +263,29 @@
   }
 
   async function borrarTx(id) {
-    const t = txMes.find(x => x.id === id);
-    if (!t) return;
+    const idx = txMes.findIndex(x => x.id === id);
+    if (idx === -1) return;
+    const t = txMes[idx];
     if (!confirm(`¿Borrar "${t.categoria} · ${fmtMoneda(t.monto)}"?`)) return;
-    loading.hidden = false;
+
+    // UI optimista: Apps Script puede tardar mucho en confirmar (medido:
+    // hasta 30+s en escrituras). Se actualiza la vista YA con el dato local
+    // y se confirma con el backend en segundo plano.
+    txMes.splice(idx, 1);
+    if (typeof saldoTotalActual === 'number') {
+      saldoTotalActual += (t.tipo === 'ingreso' ? -t.monto : t.monto);
+      renderSaldoTotal(saldoTotalActual);
+    }
+    renderKPIs(txMes, ultimoResumen);
+    renderAlertas(txMes);
+    Charts.renderDonut($('#chartDonut'), gastosPorCategoria(txMes));
+    renderTabla();
+    mostrarToast('✓ Borrado', 'ok');
+
     try {
       await Sheets.borrar(id);
-      mostrarToast('✓ Borrado', 'ok');
-      await cargar();
     } catch (err) {
-      mostrarToast('✗ No se pudo borrar: ' + err.message, 'error');
-      loading.hidden = true;
+      mostrarToast('⚠ No se pudo confirmar el borrado en el servidor', 'error');
     }
   }
 
