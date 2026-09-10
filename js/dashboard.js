@@ -20,17 +20,8 @@
   const mesLabel = $('#mesLabel');
   const loading  = $('#loading');
 
-  // ------------------------------------------------------------
-  // Caché local por mes (stale-while-revalidate): Apps Script gratuito
-  // puede tardar 3-18s en responder (variable, no lo controlamos). Para que
-  // la app no se sienta congelada, se muestra YA el último dato conocido de
-  // ese mes (si existe) mientras se refresca en segundo plano.
-  // ------------------------------------------------------------
-  const CacheDash = {
-    _key(mes) { return 'fm_cache_dash_' + mes; },
-    get(mes) { try { return JSON.parse(localStorage.getItem(this._key(mes))); } catch (e) { return null; } },
-    set(mes, d) { try { localStorage.setItem(this._key(mes), JSON.stringify(d)); } catch (e) { /* localStorage lleno: ignorar */ } },
-  };
+  // (CacheDash vive en sheets.js — compartido con form.js, que precarga
+  // el mes actual en segundo plano mientras el usuario llena el formulario)
 
   // ------------------------------------------------------------
   // Carga principal

@@ -66,6 +66,23 @@ const Sheets = {
   async probar() { await this.leer(); return true; },
 };
 
+/* ---------- Caché local del dashboard por mes (stale-while-revalidate) ----------
+   Apps Script (cuenta gratuita) puede tardar 3-18s en responder — variable,
+   no lo controlamos. Se guarda el último resultado conocido de cada mes para
+   mostrarlo instantáneo mientras se refresca en segundo plano. Compartido
+   entre dashboard.js (lo lee/usa) y form.js (lo precarga en background). */
+const CacheDash = {
+  _key(mes) { return 'fm_cache_dash_' + mes; },
+  get(mes) { try { return JSON.parse(localStorage.getItem(this._key(mes))); } catch (e) { return null; } },
+  set(mes, d) { try { localStorage.setItem(this._key(mes), JSON.stringify(d)); } catch (e) { /* localStorage lleno: ignorar */ } },
+
+  /** Refresca el caché de un mes en segundo plano, sin bloquear ni avisar si falla. */
+  async precargar(mes, mesesRecientes) {
+    try { this.set(mes, await Sheets.dashboard(mes, mesesRecientes)); }
+    catch (e) { /* silencioso: es solo una precarga oportunista */ }
+  },
+};
+
 /* ---------- Cola offline ---------- */
 const Cola = {
   KEY: 'fm_cola',

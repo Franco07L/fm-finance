@@ -214,7 +214,14 @@
     setTipo('gasto');
     refrescarColaBadge();
     if (!Conexion.configurada()) abrirConfig();
-    else intentarVaciarCola();
+    else {
+      intentarVaciarCola();
+      // Precarga el dashboard del mes actual en segundo plano mientras el
+      // usuario llena el form — si Apps Script tarda (3-18s típico en cuenta
+      // gratuita), cuando vuelva al dashboard probablemente ya esté cacheado.
+      const mes = mesActualYYYYMM();
+      CacheDash.precargar(mes, mesesAnteriores(mes, 3).join(','));
+    }
 
     if (window.gsap) {
       gsap.from('.form-card', { opacity: 0, y: 30, duration: 0.4, ease: 'power2.out' });

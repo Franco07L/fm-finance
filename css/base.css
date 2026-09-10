@@ -161,18 +161,19 @@ input, select, textarea {
 .toast.ok    { color: var(--accent-green); border-color: rgba(0,255,136,0.4); }
 .toast.error { color: var(--accent-red);   border-color: rgba(255,68,68,0.4); }
 
-/* Botón cerrar (X) en overlays (config / metas) */
+/* Botón cerrar (X) en overlays (config / metas) y tarjetas (form).
+   Sutil por defecto (sin fondo, ícono tenue) — solo se resalta al hover,
+   circular para no chocar con la esquina redondeada del contenedor. */
 .cfg-card { position: relative; }
 .cfg-x {
-  position: absolute; top: 12px; right: 12px; z-index: 3;
-  width: 32px; height: 32px; border-radius: var(--radius-sm);
-  background: rgba(255,107,157,0.12); border: 1px solid rgba(255,107,157,0.4);
-  color: var(--accent-pink); font-size: 14px; font-weight: 700; line-height: 1;
+  position: absolute; top: 10px; right: 10px; z-index: 3;
+  width: 26px; height: 26px; border-radius: 50%;
+  background: transparent; border: none;
+  color: var(--text-muted); font-size: 12px; line-height: 1;
   display: grid; place-items: center;
-  box-shadow: 0 2px 10px rgba(255,107,157,0.15);
-  transition: color .15s, border-color .15s, background .15s;
+  transition: color .15s, background .15s;
 }
-.cfg-x:hover { color: #fff; border-color: var(--accent-pink); background: rgba(255,107,157,0.3); }
+.cfg-x:hover { color: var(--accent-pink); background: rgba(255,107,157,0.12); }
 
 /* Scrollbar */
 ::-webkit-scrollbar { width: 10px; height: 10px; }
