@@ -66,16 +66,20 @@ function doPost(e) {
     const accion = data.accion || 'crear';
 
     if (accion === 'guardarMetas') {
+      // OJO: guardar metas NO invalida el caché del dashboard (que sí exige
+      // reabrir el Sheet). Las metas viven aparte en Propiedades del script
+      // (barato) y dashboardCacheado_() las sirve SIEMPRE frescas, así que
+      // no hace falta pagar el costo completo del Sheet solo por esto.
       PropertiesService.getScriptProperties().setProperty('METAS_JSON', JSON.stringify(data.metas || []));
-      invalidarCache_();
       return json({ ok: true });
     }
 
     const sheet = getSheet();
 
     if (accion === 'borrar') {
-      const r = borrarPorId(sheet, data.id);
+      const r = borrarPorId(sheet, data.id); // ya incluye r.mes de la fila borrada
       invalidarCache_();
+      if (r.ok) warmCache_(sheet, r.mes, data.mesesRecientes);
       return json(r);
     }
 
@@ -99,6 +103,13 @@ function doPost(e) {
     ]);
 
     invalidarCache_();
+    // CLAVE para la lentitud ">15s tras registrar": sin esto, la escritura
+    // pagaba el costo de abrir el Sheet, y la SIGUIENTE lectura (el usuario
+    // volviendo al dashboard) pagaba ESE MISMO costo otra vez porque la
+    // acabábamos de invalidar. Aprovechamos que el Sheet ya está abierto
+    // aquí mismo para recalentar de una vez las claves de caché más
+    // probables — así esa siguiente lectura sale de caché, instantánea.
+    warmCache_(sheet, mes, data.mesesRecientes);
     return json({ ok: true, id: id });
   } catch (err) {
     return json({ ok: false, error: String(err) });
@@ -131,10 +142,7 @@ function doGet(e) {
     // OJO: getSheet() es LO CARO. No se llama hasta que de verdad haga falta,
     // y las rutas cacheadas de abajo lo saltan por completo.
 
-    if (action === 'dashboard') {
-      return jsonCacheado_('dash|' + (p.mes || '') + '|' + (p.mesesRecientes || ''),
-        () => ({ ok: true, data: datosDashboard(getSheet(), p.mes, p.mesesRecientes) }));
-    }
+    if (action === 'dashboard') return dashboardCacheado_(p.mes, p.mesesRecientes);
 
     if (action === 'summary') {
       return jsonCacheado_('sum', () => ({ ok: true, data: resumen6MesesDesde(todasLasTransacciones(getSheet())) }));
@@ -216,12 +224,13 @@ function resumen6Meses(sheet) { return resumen6MesesDesde(todasLasTransacciones(
 function borrarPorId(sheet, id) {
   const ultima = sheet.getLastRow();
   if (ultima < 2) return { ok: false, error: 'ID no encontrado' };
-  // Solo la columna de IDs: mover 1 columna en vez de 10.
-  const ids = sheet.getRange(2, 1, ultima - 1, 1).getValues();
-  for (let i = 0; i < ids.length; i++) {
-    if (ids[i][0] === id) {
+  // Columnas ID (A) y Mes (J): lo mínimo para encontrar la fila y saber
+  // qué mes recalentar en warmCache_() sin releer toda la hoja.
+  const datos = sheet.getRange(2, 1, ultima - 1, HEADERS.length).getValues();
+  for (let i = 0; i < datos.length; i++) {
+    if (datos[i][0] === id) {
       sheet.deleteRow(i + 2);
-      return { ok: true, borrado: id };
+      return { ok: true, borrado: id, mes: fmtCampoFecha(datos[i][2], 'yyyy-MM') };
     }
   }
   return { ok: false, error: 'ID no encontrado' };
@@ -306,11 +315,89 @@ function jsonCacheado_(clave, calcular) {
   return texto_(body);
 }
 
+// Como jsonCacheado_, pero para 'dashboard': las metas SIEMPRE se sirven
+// frescas (releídas de Propiedades, barato) encima del payload cacheado,
+// para no depender de invalidar el caché pesado del Sheet solo por editar
+// una meta de ahorro.
+function dashboardCacheado_(mes, mesesRecientes) {
+  const c = cache_();
+  const k = 'v' + dataVersion_() + '|dash|' + (mes || '') + '|' + (mesesRecientes || '');
+  const metasFrescas = leerMetasGuardadas();
+
+  const hit = c.get(k);
+  if (hit) {
+    const obj = JSON.parse(hit);
+    obj.data.metas = metasFrescas;
+    return texto_(JSON.stringify(obj));
+  }
+
+  const obj = { ok: true, data: datosDashboard(getSheet(), mes, mesesRecientes) };
+  obj.data.metas = metasFrescas; // ya venía de leerMetasGuardadas() adentro, pero por claridad/consistencia
+  const body = JSON.stringify(obj);
+  if (body.length < CACHE_MAX) c.put(k, body, CACHE_TTL);
+  return texto_(body);
+}
+
 // Opcional: ejecútalo desde el editor si alguna vez quieres forzar
 // que la próxima lectura vuelva a mirar el Sheet.
 function limpiarCache() {
   invalidarCache_();
   SpreadsheetApp.getActiveSpreadsheet().toast('Caché invalidada.');
+}
+
+// Réplica server-side de mesesAnteriores() en utils.js (cliente): los n
+// meses ANTERIORES a yyyymm, más viejo primero. Se usa para que la clave
+// de caché que precalentamos coincida con la que el dashboard pedirá.
+function mesesAnterioresCSV_(yyyymm, n) {
+  const out = [];
+  let [y, m] = String(yyyymm).split('-').map(Number);
+  for (let i = 0; i < n; i++) {
+    out.unshift(y + '-' + String(m).padStart(2, '0'));
+    m--; if (m < 1) { m = 12; y--; }
+  }
+  return out.join(',');
+}
+
+// Guarda directamente un objeto ya calculado bajo la versión ACTUAL de
+// caché (llamar SOLO después de invalidarCache_(), para que quede bajo
+// la versión nueva y no una que ya está huérfana).
+function guardarEnCache_(clave, obj) {
+  const body = JSON.stringify(obj);
+  if (body.length < CACHE_MAX) cache_().put('v' + dataVersion_() + '|' + clave, body, CACHE_TTL);
+}
+
+// Se llama justo después de escribir (crear/borrar), con el Sheet ya
+// abierto: en vez de dejar que la PRÓXIMA lectura pague de nuevo el costo
+// de abrir/leer el Sheet (que acabamos de invalidar), la calculamos y
+// cacheamos aquí mismo. Cubre las claves que de verdad se piden:
+// el dashboard del mes afectado (con la MISMA ventana de "recientes" que
+// pide el cliente, si la mandó), balance, resumen y read del mes.
+function warmCache_(sheet, mes, mesesRecientesCSV) {
+  try {
+    const todas = todasLasTransacciones(sheet);
+    const ventana = mesesRecientesCSV || mesesAnterioresCSV_(mes, 3);
+
+    guardarEnCache_('dash|' + mes + '|' + ventana, { ok: true, data: {
+      tx: filtrarPorMeses(todas, [mes]),
+      resumen: resumen6MesesDesde(todas),
+      metas: leerMetasGuardadas(),
+      saldo: saldoTotalDesde(todas),
+      txsRecientes: filtrarPorMeses(todas, String(ventana).split(',')),
+    }});
+    // Variante sin ventana (por si el cliente la pide vacía).
+    guardarEnCache_('dash|' + mes + '|', { ok: true, data: {
+      tx: filtrarPorMeses(todas, [mes]),
+      resumen: resumen6MesesDesde(todas),
+      metas: leerMetasGuardadas(),
+      saldo: saldoTotalDesde(todas),
+      txsRecientes: [],
+    }});
+    guardarEnCache_('bal', { ok: true, data: { saldo: saldoTotalDesde(todas) } });
+    guardarEnCache_('sum', { ok: true, data: resumen6MesesDesde(todas) });
+    guardarEnCache_('read|' + mes, { ok: true, data: filtrarPorMeses(todas, [mes]) });
+  } catch (e) {
+    // Nunca dejar que un fallo al precalentar tumbe la escritura misma.
+  }
 }
 
 /* ════════════════════════════════════════════════════════════

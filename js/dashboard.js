@@ -303,7 +303,10 @@
     mostrarToast('✓ Borrado', 'ok');
 
     try {
-      await Sheets.borrar(id);
+      // Misma ventana que usa cargar(): el backend, con el Sheet ya abierto
+      // para borrar, precalienta la caché con esta clave exacta — así la
+      // próxima carga del dashboard no vuelve a pagar el costo de abrirlo.
+      await Sheets.borrar(id, mesesAnteriores(mesActual, 3).join(','));
     } catch (err) {
       mostrarToast('⚠ No se pudo confirmar el borrado en el servidor', 'error');
     }

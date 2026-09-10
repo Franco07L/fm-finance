@@ -136,6 +136,14 @@
     const fecha = fechaParaEnviar();
     if (fecha) tx.fecha = fecha;
 
+    // Mandamos la MISMA ventana de "meses recientes" que pide el dashboard
+    // (mesesAnteriores(mes,3)) para que el backend, que ya deja el Sheet
+    // abierto para escribir, precaliente la caché con la clave EXACTA que
+    // el dashboard va a pedir después. Así la próxima carga sale de caché
+    // en vez de volver a pagar el costo de abrir el Sheet.
+    const mesTx = (tx.fecha || fechaISO()).slice(0, 7);
+    tx.mesesRecientes = mesesAnteriores(mesTx, 3).join(',');
+
     // UI optimista: Apps Script (cuenta gratuita) puede tardar de 2 a 30+
     // segundos en confirmar un registro (medido). No tiene sentido bloquear
     // al usuario esperando eso — se muestra "Registrado" YA y el form se
@@ -147,10 +155,9 @@
 
     Sheets.crear(tx)
       .then(() => {
-        // Refresca el caché del mes afectado: si el usuario vuelve al
-        // dashboard, ya ve el movimiento nuevo sin esperar al backend.
-        const mes = (tx.fecha || fechaISO()).slice(0, 7);
-        CacheDash.precargar(mes, mesesAnteriores(mes, 3).join(','));
+        // El backend ya dejó la caché de este mes precalentada (misma
+        // llamada que escribió). Este GET ahora es rápido, no un recálculo.
+        CacheDash.precargar(mesTx, tx.mesesRecientes);
         return intentarVaciarCola(); // por si había pendientes de antes
       })
       .catch(() => {

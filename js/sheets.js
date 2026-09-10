@@ -61,7 +61,10 @@ const Sheets = {
   resumen()  { return this._get({ action: 'summary' }); },
   balance()  { return this._get({ action: 'balance' }); }, // { saldo }: acumulado de TODO el historial
   crear(tx)  { return this._post(Object.assign({ accion: 'crear' }, tx)); },
-  borrar(id) { return this._post({ accion: 'borrar', id }); },
+  // mesesRecientes es opcional: si se manda, el backend precalienta la
+  // caché del dashboard con esa ventana exacta tras borrar (ver Code.gs
+  // warmCache_). Sin ella igual funciona, solo que sin ese atajo.
+  borrar(id, mesesRecientes) { return this._post({ accion: 'borrar', id, mesesRecientes }); },
 
   // Todo lo que necesita el dashboard en UNA sola llamada/lectura de hoja
   // (evita disparar 5 invocaciones simultáneas al backend).
