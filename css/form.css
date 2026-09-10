@@ -37,6 +37,11 @@
 /* ---------- Form card ---------- */
 .form-card { padding: 20px; margin-top: 16px; display: flex; flex-direction: column; gap: 6px; }
 
+/* Fila propia para el botón cerrar, en el FLUJO normal (no absolute) —
+   así nunca se superpone con el toggle GASTO/INGRESO de abajo. */
+.form-card-head { display: flex; justify-content: flex-end; margin: -6px -6px 2px 0; }
+.cfg-x-inline { position: static; } /* anula el position:absolute de .cfg-x */
+
 .field-label {
   font-family: var(--font-mono); font-size: 12px; color: var(--text-secondary);
   text-transform: uppercase; letter-spacing: 0.06em; margin-top: 12px; margin-bottom: 4px;
