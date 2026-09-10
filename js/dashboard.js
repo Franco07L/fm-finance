@@ -27,18 +27,17 @@
     if (!Conexion.configurada()) { abrirConfig(); return; }
     loading.hidden = false;
     try {
+      // UNA sola llamada al backend (antes eran 5 en paralelo: Apps Script a
+      // veces rechaza tantas invocaciones simultáneas y devuelve HTML de error
+      // en vez de JSON). El backend hace una única lectura de la hoja y arma
+      // todo: transacciones del mes, resumen, metas, saldo y ventana de recurrentes.
       const ventanaRecurrentes = mesesAnteriores(mesActual, 3).join(',');
-      const [txs, resumen, serverMetas, saldoData, txsRecientes] = await Promise.all([
-        Sheets.leer(mesActual),
-        Sheets.resumen(),
-        Sheets.leerMetas().catch(() => undefined), // undefined=sin red; null=backend vacío; array=datos
-        Sheets.balance().catch(() => null),
-        Sheets.leer(ventanaRecurrentes).catch(() => []),
-      ]);
+      const d = await Sheets.dashboard(mesActual, ventanaRecurrentes);
+      const txs = d.tx, resumen = d.resumen, serverMetas = d.metas;
       txMes = txs;
       pagina = 1;
-      saldoTotalActual = (saldoData && typeof saldoData.saldo === 'number') ? saldoData.saldo : null;
-      recurrentesSet = calcularRecurrentes(txsRecientes);
+      saldoTotalActual = typeof d.saldo === 'number' ? d.saldo : null;
+      recurrentesSet = calcularRecurrentes(d.txsRecientes);
       await sincronizarMetas(serverMetas);
       renderSaldoTotal(saldoTotalActual);
       renderKPIs(txs, resumen);

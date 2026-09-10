@@ -68,6 +68,10 @@ function doPost(e) {
 
 // ─────────────────────────────────────────────────────────────
 // 3) LECTURA — la app pide datos con un GET
+//    ?action=dashboard&token=XXX&mes=2026-09&mesesRecientes=2026-07,2026-08,2026-09
+//         -> TODO lo que necesita el dashboard en UNA sola llamada/lectura de hoja
+//            (recomendado: evita disparar varias invocaciones simultaneas, que
+//            Apps Script a veces rechaza devolviendo una pagina HTML en vez de JSON)
 //    ?action=read&token=XXX            -> ultimas 200
 //    ?action=read&token=XXX&mes=2026-06            -> un mes
 //    ?action=read&token=XXX&mes=2026-07,2026-08,2026-09  -> varios meses (CSV), sin tope de 200
@@ -82,11 +86,13 @@ function doGet(e) {
     const sheet = getSheet();
     const action = p.action || 'read';
 
-    if (action === 'summary') return json({ ok: true, data: resumen6Meses(sheet) });
+    if (action === 'dashboard') return json({ ok: true, data: datosDashboard(sheet, p.mes, p.mesesRecientes) });
+
+    if (action === 'summary') return json({ ok: true, data: resumen6MesesDesde(todasLasTransacciones(sheet)) });
 
     if (action === 'metas') return json({ ok: true, data: leerMetasGuardadas() });
 
-    if (action === 'balance') return json({ ok: true, data: { saldo: saldoTotal(sheet) } });
+    if (action === 'balance') return json({ ok: true, data: { saldo: saldoTotalDesde(todasLasTransacciones(sheet)) } });
 
     // action === 'read'
     return json({ ok: true, data: leerTransacciones(sheet, p.mes) });
@@ -98,39 +104,50 @@ function doGet(e) {
 // ─────────────────────────────────────────────────────────────
 // Helpers de datos
 // ─────────────────────────────────────────────────────────────
-function leerTransacciones(sheet, mes) {
+
+// Lee la hoja UNA sola vez y arma todo lo que pide el dashboard: transacciones
+// del mes, resumen de 6 meses, metas, saldo total y transacciones recientes
+// (para detectar gastos recurrentes). Evita 5 llamadas HTTP separadas.
+function datosDashboard(sheet, mes, mesesRecientes) {
+  const todas = todasLasTransacciones(sheet);
+  const mesesRec = mesesRecientes ? String(mesesRecientes).split(',') : [];
+  return {
+    tx: filtrarPorMeses(todas, mes ? [mes] : null),
+    resumen: resumen6MesesDesde(todas),
+    metas: leerMetasGuardadas(),
+    saldo: saldoTotalDesde(todas),
+    txsRecientes: mesesRec.length ? filtrarPorMeses(todas, mesesRec) : [],
+  };
+}
+
+// Lee TODA la hoja una vez y la convierte a objetos (sin ordenar/filtrar).
+function todasLasTransacciones(sheet) {
   const rows = sheet.getDataRange().getValues();
   rows.shift(); // quita encabezados
-  let txs = rows.map(filaAObjeto).filter(t => t.id); // descarta filas vacias
-  if (mes) {
-    const meses = String(mes).split(','); // soporta "2026-06" o "2026-07,2026-08,2026-09"
-    txs = txs.filter(t => meses.indexOf(t.mes) !== -1);
-  }
+  return rows.map(filaAObjeto).filter(t => t.id); // descarta filas vacias
+}
+
+function filtrarPorMeses(todas, meses) {
+  let txs = meses ? todas.filter(t => meses.indexOf(t.mes) !== -1) : todas.slice();
   txs.reverse(); // mas recientes primero
-  return mes ? txs : txs.slice(0, 200);
+  return meses ? txs : txs.slice(0, 200);
 }
 
-// Suma TODO el historial (ingresos - gastos) recorriendo la hoja una sola vez.
-// Barato: Apps Script procesa miles de filas de sobra dentro del timeout.
-function saldoTotal(sheet) {
-  const rows = sheet.getDataRange().getValues();
-  rows.shift();
-  let saldo = 0;
-  rows.forEach(r => {
-    if (!r[0]) return; // fila vacia
-    const monto = Number(r[6]) || 0;
-    saldo += (r[3] === 'ingreso') ? monto : -monto;
-  });
-  return saldo;
+function leerTransacciones(sheet, mes) {
+  const meses = mes ? String(mes).split(',') : null; // soporta "2026-06" o CSV de varios
+  return filtrarPorMeses(todasLasTransacciones(sheet), meses);
 }
 
-function resumen6Meses(sheet) {
-  const rows = sheet.getDataRange().getValues();
-  rows.shift();
+// Suma TODO el historial (ingresos - gastos). Barato: Apps Script procesa
+// miles de filas de sobra dentro del timeout.
+function saldoTotalDesde(todas) {
+  return todas.reduce((saldo, t) => saldo + (t.tipo === 'ingreso' ? t.monto : -t.monto), 0);
+}
+function saldoTotal(sheet) { return saldoTotalDesde(todasLasTransacciones(sheet)); }
+
+function resumen6MesesDesde(todas) {
   const acc = {}; // { '2026-06': {ingreso: x, gasto: y} }
-  rows.forEach(r => {
-    const t = filaAObjeto(r);
-    if (!t.id) return;
+  todas.forEach(t => {
     if (!acc[t.mes]) acc[t.mes] = { ingreso: 0, gasto: 0 };
     if (t.tipo === 'ingreso') acc[t.mes].ingreso += t.monto;
     else acc[t.mes].gasto += t.monto;
@@ -138,6 +155,7 @@ function resumen6Meses(sheet) {
   const meses = Object.keys(acc).sort().slice(-6);
   return meses.map(m => ({ mes: m, ingreso: acc[m].ingreso, gasto: acc[m].gasto }));
 }
+function resumen6Meses(sheet) { return resumen6MesesDesde(todasLasTransacciones(sheet)); }
 
 function borrarPorId(sheet, id) {
   const rows = sheet.getDataRange().getValues();

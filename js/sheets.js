@@ -5,12 +5,24 @@
    ============================================================ */
 
 const Sheets = {
+  // Apps Script a veces rechaza invocaciones (varias llamadas simultáneas,
+  // cold start) y devuelve una página HTML de error en vez de JSON —
+  // res.json() truena con "Unexpected token '<'". Reintenta UNA vez tras
+  // una pausa antes de rendirse; no reintenta errores de negocio (ok:false).
+  async _fetchJson(doFetch) {
+    try {
+      return await (await doFetch()).json();
+    } catch (e) {
+      await new Promise((r) => setTimeout(r, 900));
+      return await (await doFetch()).json();
+    }
+  },
+
   async _get(params) {
     const { url, token } = Conexion.get();
     if (!url || !token) throw new Error('Sin configurar');
     const qs = new URLSearchParams(Object.assign({}, params, { token })).toString();
-    const res = await fetch(`${url}?${qs}`, { method: 'GET' });
-    const data = await res.json();
+    const data = await this._fetchJson(() => fetch(`${url}?${qs}`, { method: 'GET' }));
     if (!data.ok) throw new Error(data.error || 'Error de lectura');
     return data.data;
   },
@@ -18,13 +30,13 @@ const Sheets = {
   async _post(payload) {
     const { url, token } = Conexion.get();
     if (!url || !token) throw new Error('Sin configurar');
-    const res = await fetch(url, {
+    const body = JSON.stringify(Object.assign({}, payload, { token }));
+    const data = await this._fetchJson(() => fetch(url, {
       method: 'POST',
       // text/plain evita el preflight CORS que Apps Script no soporta
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify(Object.assign({}, payload, { token })),
-    });
-    const data = await res.json();
+      body,
+    }));
     if (!data.ok) throw new Error(data.error || 'Error al guardar');
     return data;
   },
@@ -34,6 +46,16 @@ const Sheets = {
   balance()  { return this._get({ action: 'balance' }); }, // { saldo }: acumulado de TODO el historial
   crear(tx)  { return this._post(Object.assign({ accion: 'crear' }, tx)); },
   borrar(id) { return this._post({ accion: 'borrar', id }); },
+
+  // Todo lo que necesita el dashboard en UNA sola llamada/lectura de hoja
+  // (evita disparar 5 invocaciones simultáneas al backend).
+  // -> { tx, resumen, metas, saldo, txsRecientes }
+  dashboard(mes, mesesRecientes) {
+    const params = { action: 'dashboard' };
+    if (mes) params.mes = mes;
+    if (mesesRecientes) params.mesesRecientes = mesesRecientes;
+    return this._get(params);
+  },
 
   // Metas de ahorro (sincronizadas entre dispositivos).
   // leerMetas devuelve el array, o null si nunca se han guardado en el backend.
