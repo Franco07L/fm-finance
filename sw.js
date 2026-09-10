@@ -6,7 +6,7 @@
    - Sube CACHE_VERSION cuando cambies archivos para forzar refresco.
    ============================================================ */
 
-const CACHE_VERSION = 'fm-finance-v17';
+const CACHE_VERSION = 'fm-finance-v18';
 
 const APP_SHELL = [
   './',
@@ -65,17 +65,21 @@ self.addEventListener('fetch', (e) => {
     return;
   }
 
-  // 4) Resto (CSS/JS/fuentes/CDN/íconos): cache-first, y guarda lo nuevo.
+  // 4) Resto (CSS/JS/fuentes/CDN/íconos): stale-while-revalidate.
+  //    Responde YA desde caché (rápido) y a la vez baja la versión nueva
+  //    para el próximo arranque. Antes era cache-first puro: rápido igual,
+  //    pero los archivos viejos se quedaban pegados hasta subir la versión
+  //    a mano, y eso causó varias veces "ya lo arreglé pero no te llega".
   e.respondWith(
     caches.match(req).then((cached) => {
-      if (cached) return cached;
-      return fetch(req).then((res) => {
+      const red = fetch(req).then((res) => {
         if (res && res.status === 200 && (url.origin === self.location.origin || url.hostname.includes('cloudflare') || url.hostname.includes('gstatic') || url.hostname.includes('googleapis'))) {
           const copy = res.clone();
           caches.open(CACHE_VERSION).then((c) => c.put(req, copy));
         }
         return res;
       }).catch(() => cached);
+      return cached || red;
     })
   );
 });

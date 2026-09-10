@@ -9,12 +9,27 @@ const Sheets = {
   // cold start) y devuelve una página HTML de error en vez de JSON —
   // res.json() truena con "Unexpected token '<'". Reintenta UNA vez tras
   // una pausa antes de rendirse; no reintenta errores de negocio (ok:false).
+  // Corta a los 12s: una petición colgada bloqueaba la UI hasta 40s.
+  // Además el reintento suele ser rapidísimo, porque el primer intento ya
+  // dejó la respuesta en la caché del servidor.
+  TIMEOUT_MS: 12000,
+
+  async _unaVez(doFetch) {
+    const ac = new AbortController();
+    const t = setTimeout(() => ac.abort(), this.TIMEOUT_MS);
+    try {
+      return await (await doFetch(ac.signal)).json();
+    } finally {
+      clearTimeout(t);
+    }
+  },
+
   async _fetchJson(doFetch) {
     try {
-      return await (await doFetch()).json();
+      return await this._unaVez(doFetch);
     } catch (e) {
-      await new Promise((r) => setTimeout(r, 900));
-      return await (await doFetch()).json();
+      await new Promise((r) => setTimeout(r, 600));
+      return await this._unaVez(doFetch);
     }
   },
 
@@ -22,7 +37,7 @@ const Sheets = {
     const { url, token } = Conexion.get();
     if (!url || !token) throw new Error('Sin configurar');
     const qs = new URLSearchParams(Object.assign({}, params, { token })).toString();
-    const data = await this._fetchJson(() => fetch(`${url}?${qs}`, { method: 'GET' }));
+    const data = await this._fetchJson((signal) => fetch(`${url}?${qs}`, { method: 'GET', signal }));
     if (!data.ok) throw new Error(data.error || 'Error de lectura');
     return data.data;
   },
@@ -31,11 +46,12 @@ const Sheets = {
     const { url, token } = Conexion.get();
     if (!url || !token) throw new Error('Sin configurar');
     const body = JSON.stringify(Object.assign({}, payload, { token }));
-    const data = await this._fetchJson(() => fetch(url, {
+    const data = await this._fetchJson((signal) => fetch(url, {
       method: 'POST',
       // text/plain evita el preflight CORS que Apps Script no soporta
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
       body,
+      signal,
     }));
     if (!data.ok) throw new Error(data.error || 'Error al guardar');
     return data;
@@ -62,8 +78,10 @@ const Sheets = {
   leerMetas()       { return this._get({ action: 'metas' }); },
   guardarMetas(arr) { return this._post({ accion: 'guardarMetas', metas: arr }); },
 
-  /** Prueba la conexión (URL+token) leyendo. Lanza error si falla. */
-  async probar() { await this.leer(); return true; },
+  /** Prueba la conexión (URL+token). Usa 'ping': valida el token sin abrir
+   *  el Sheet, así que responde al instante en vez de tardar lo mismo que
+   *  una lectura completa. */
+  async probar() { await this._get({ action: 'ping' }); return true; },
 };
 
 /* ---------- Caché local del dashboard por mes (stale-while-revalidate) ----------

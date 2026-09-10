@@ -47,12 +47,32 @@
       CacheDash.set(mesDeEstaCarga, d);
       await sincronizarMetas(d.metas);
       if (mesActual === mesDeEstaCarga) aplicarDatosDashboard(d); // sigue en el mismo mes: refresca con datos frescos
+      precargarVecinos(mesDeEstaCarga); // en segundo plano: cambiar de mes será instantáneo
     } catch (err) {
       if (!cache) mostrarToast('✗ Error al cargar: ' + err.message, 'error', 4000);
       // si había caché, se queda mostrando eso — mejor un dato viejo que una pantalla rota
     } finally {
       loading.hidden = true;
     }
+  }
+
+  // Trae en background el mes anterior y el siguiente y los deja en caché.
+  // Como el servidor ya tiene la lectura cacheada, estas llamadas son baratas
+  // — y cuando el usuario pulse ◀ o ▶ el mes aparece al instante.
+  function precargarVecinos(mes) {
+    [-1, 1].forEach((delta) => {
+      const m = desplazarMes(mes, delta);
+      if (CacheDash.get(m)) return; // ya lo tenemos
+      CacheDash.precargar(m, mesesAnteriores(m, 3).join(','));
+    });
+  }
+
+  function desplazarMes(yyyymm, delta) {
+    let [y, m] = yyyymm.split('-').map(Number);
+    m += delta;
+    if (m < 1) { m = 12; y--; }
+    if (m > 12) { m = 1; y++; }
+    return y + '-' + String(m).padStart(2, '0');
   }
 
   function aplicarDatosDashboard(d) {
@@ -416,12 +436,7 @@
   // Navegación de mes
   // ------------------------------------------------------------
   function setMes(yyyymm) { mesActual = yyyymm; mesLabel.textContent = nombreMes(yyyymm); cargar(); }
-  function moverMes(delta) {
-    let [y, m] = mesActual.split('-').map(Number);
-    m += delta;
-    if (m < 1) { m = 12; y--; } else if (m > 12) { m = 1; y++; }
-    setMes(`${y}-${String(m).padStart(2, '0')}`);
-  }
+  function moverMes(delta) { setMes(desplazarMes(mesActual, delta)); }
   $('#mesPrev').addEventListener('click', () => moverMes(-1));
   $('#mesNext').addEventListener('click', () => moverMes(1));
   $('#txPrev').addEventListener('click', () => { if (pagina > 1) { pagina--; renderTabla(); } });

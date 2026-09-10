@@ -146,7 +146,13 @@
     limpiarForm();
 
     Sheets.crear(tx)
-      .then(() => intentarVaciarCola()) // por si había pendientes de antes
+      .then(() => {
+        // Refresca el caché del mes afectado: si el usuario vuelve al
+        // dashboard, ya ve el movimiento nuevo sin esperar al backend.
+        const mes = (tx.fecha || fechaISO()).slice(0, 7);
+        CacheDash.precargar(mes, mesesAnteriores(mes, 3).join(','));
+        return intentarVaciarCola(); // por si había pendientes de antes
+      })
       .catch(() => {
         Cola.agregar(tx);
         refrescarColaBadge();

@@ -21,6 +21,40 @@ const SHEET_NAME = 'Transacciones';
 const HEADERS = ['ID', 'Timestamp', 'Fecha', 'Tipo', 'Categoria',
                  'Subcategoria', 'Monto', 'Descripcion', 'Fuente', 'Mes'];
 
+// Zona horaria FIJA. No dependemos de la del proyecto (si queda en otra,
+// una fecha "hoy" puede caer en el mes anterior al formatear).
+const TZ = 'America/Lima';
+
+// ─────────────────────────────────────────────────────────────
+// 1.b) CACHÉ DE SERVIDOR — lo que de verdad arregla la lentitud
+// ─────────────────────────────────────────────────────────────
+// Medido: abrir el Spreadsheet y leerlo tarda entre 3 y 40 segundos en
+// cuentas gratuitas (es lo caro, no el cálculo). CacheService vive en la
+// infraestructura de Apps Script y responde en milisegundos.
+//
+// Estrategia: la respuesta YA SERIALIZADA del dashboard se guarda en caché.
+// Mientras nadie escriba, las lecturas ni siquiera tocan el Sheet.
+// Cualquier escritura (crear/borrar/metas) sube DATA_VER, lo que invalida
+// todas las claves de golpe (van versionadas en el nombre).
+const CACHE_TTL = 21600;           // 6 h (máximo que permite Apps Script)
+const CACHE_MAX = 95000;           // límite real por entrada: 100 KB
+const VER_KEY   = 'DATA_VER';
+
+function cache_() { return CacheService.getScriptCache(); }
+
+function dataVersion_() {
+  const c = cache_();
+  let v = c.get(VER_KEY);
+  if (!v) { v = String(Date.now()); c.put(VER_KEY, v, CACHE_TTL); }
+  return v;
+}
+
+// Se llama tras CADA escritura: la versión cambia, las claves viejas
+// quedan huérfanas y la siguiente lectura relee el Sheet una sola vez.
+function invalidarCache_() {
+  cache_().put(VER_KEY, String(Date.now()), CACHE_TTL);
+}
+
 // ─────────────────────────────────────────────────────────────
 // 2) ESCRITURA — la app envía un POST (text/plain con JSON dentro)
 // ─────────────────────────────────────────────────────────────
@@ -29,28 +63,32 @@ function doPost(e) {
     const data = JSON.parse(e.postData.contents);
     if (data.token !== TOKEN) return json({ ok: false, error: 'Token invalido' });
 
-    const sheet = getSheet();
     const accion = data.accion || 'crear';
-
-    if (accion === 'borrar') {
-      return json(borrarPorId(sheet, data.id));
-    }
 
     if (accion === 'guardarMetas') {
       PropertiesService.getScriptProperties().setProperty('METAS_JSON', JSON.stringify(data.metas || []));
+      invalidarCache_();
       return json({ ok: true });
+    }
+
+    const sheet = getSheet();
+
+    if (accion === 'borrar') {
+      const r = borrarPorId(sheet, data.id);
+      invalidarCache_();
+      return json(r);
     }
 
     // accion === 'crear'
     const now = new Date();
     const fecha = data.fecha ? new Date(data.fecha) : now;
     const id = Utilities.getUuid();
-    const mes = Utilities.formatDate(fecha, Session.getScriptTimeZone(), 'yyyy-MM');
+    const mes = Utilities.formatDate(fecha, TZ, 'yyyy-MM');
 
     sheet.appendRow([
       id,
       now,
-      Utilities.formatDate(fecha, Session.getScriptTimeZone(), 'yyyy-MM-dd'),
+      Utilities.formatDate(fecha, TZ, 'yyyy-MM-dd'),
       data.tipo || '',
       data.categoria || '',
       data.subcategoria || '',
@@ -60,6 +98,7 @@ function doPost(e) {
       mes
     ]);
 
+    invalidarCache_();
     return json({ ok: true, id: id });
   } catch (err) {
     return json({ ok: false, error: String(err) });
@@ -83,19 +122,32 @@ function doGet(e) {
     const p = e.parameter || {};
     if (p.token !== TOKEN) return json({ ok: false, error: 'Token invalido' });
 
-    const sheet = getSheet();
     const action = p.action || 'read';
 
-    if (action === 'dashboard') return json({ ok: true, data: datosDashboard(sheet, p.mes, p.mesesRecientes) });
+    // Prueba de conexión: NO toca el Sheet (antes tardaba lo mismo que
+    // una lectura completa; ahora responde al instante).
+    if (action === 'ping') return json({ ok: true, data: { pong: true } });
 
-    if (action === 'summary') return json({ ok: true, data: resumen6MesesDesde(todasLasTransacciones(sheet)) });
+    // OJO: getSheet() es LO CARO. No se llama hasta que de verdad haga falta,
+    // y las rutas cacheadas de abajo lo saltan por completo.
+
+    if (action === 'dashboard') {
+      return jsonCacheado_('dash|' + (p.mes || '') + '|' + (p.mesesRecientes || ''),
+        () => ({ ok: true, data: datosDashboard(getSheet(), p.mes, p.mesesRecientes) }));
+    }
+
+    if (action === 'summary') {
+      return jsonCacheado_('sum', () => ({ ok: true, data: resumen6MesesDesde(todasLasTransacciones(getSheet())) }));
+    }
 
     if (action === 'metas') return json({ ok: true, data: leerMetasGuardadas() });
 
-    if (action === 'balance') return json({ ok: true, data: { saldo: saldoTotalDesde(todasLasTransacciones(sheet)) } });
+    if (action === 'balance') {
+      return jsonCacheado_('bal', () => ({ ok: true, data: { saldo: saldoTotalDesde(todasLasTransacciones(getSheet())) } }));
+    }
 
     // action === 'read'
-    return json({ ok: true, data: leerTransacciones(sheet, p.mes) });
+    return jsonCacheado_('read|' + (p.mes || ''), () => ({ ok: true, data: leerTransacciones(getSheet(), p.mes) }));
   } catch (err) {
     return json({ ok: false, error: String(err) });
   }
@@ -120,10 +172,14 @@ function datosDashboard(sheet, mes, mesesRecientes) {
   };
 }
 
-// Lee TODA la hoja una vez y la convierte a objetos (sin ordenar/filtrar).
+// Lee las filas con datos y las convierte a objetos (sin ordenar/filtrar).
+// Rango ACOTADO a propósito: getDataRange() devuelve todo el "rango usado",
+// que tras borrar filas puede quedar inflado con miles de celdas vacías y
+// hace que cada lectura mueva mucho más de lo necesario.
 function todasLasTransacciones(sheet) {
-  const rows = sheet.getDataRange().getValues();
-  rows.shift(); // quita encabezados
+  const ultima = sheet.getLastRow();
+  if (ultima < 2) return [];
+  const rows = sheet.getRange(2, 1, ultima - 1, HEADERS.length).getValues();
   return rows.map(filaAObjeto).filter(t => t.id); // descarta filas vacias
 }
 
@@ -158,10 +214,13 @@ function resumen6MesesDesde(todas) {
 function resumen6Meses(sheet) { return resumen6MesesDesde(todasLasTransacciones(sheet)); }
 
 function borrarPorId(sheet, id) {
-  const rows = sheet.getDataRange().getValues();
-  for (let i = 1; i < rows.length; i++) {
-    if (rows[i][0] === id) {
-      sheet.deleteRow(i + 1);
+  const ultima = sheet.getLastRow();
+  if (ultima < 2) return { ok: false, error: 'ID no encontrado' };
+  // Solo la columna de IDs: mover 1 columna en vez de 10.
+  const ids = sheet.getRange(2, 1, ultima - 1, 1).getValues();
+  for (let i = 0; i < ids.length; i++) {
+    if (ids[i][0] === id) {
+      sheet.deleteRow(i + 2);
       return { ok: true, borrado: id };
     }
   }
@@ -182,7 +241,7 @@ function esFecha(v) {
 
 // Formatea sea Date (lo que devuelve Sheets) o texto.
 function fmtCampoFecha(v, fmt) {
-  if (esFecha(v)) return Utilities.formatDate(v, Session.getScriptTimeZone(), fmt);
+  if (esFecha(v)) return Utilities.formatDate(v, TZ, fmt);
   return (v === '' || v == null) ? '' : String(v);
 }
 
@@ -223,9 +282,35 @@ function setupSheet() {
 }
 
 function json(obj) {
+  return texto_(JSON.stringify(obj));
+}
+
+function texto_(str) {
   return ContentService
-    .createTextOutput(JSON.stringify(obj))
+    .createTextOutput(str)
     .setMimeType(ContentService.MimeType.JSON);
+}
+
+// Devuelve la respuesta desde caché si existe; si no, ejecuta calcular()
+// (que SÍ abre el Sheet), guarda el JSON ya serializado y lo devuelve.
+// La clave lleva la versión de datos incrustada: al escribir, la versión
+// cambia y todas las entradas anteriores dejan de encontrarse.
+function jsonCacheado_(clave, calcular) {
+  const c = cache_();
+  const k = 'v' + dataVersion_() + '|' + clave;
+  const hit = c.get(k);
+  if (hit) return texto_(hit);
+
+  const body = JSON.stringify(calcular());
+  if (body.length < CACHE_MAX) c.put(k, body, CACHE_TTL);
+  return texto_(body);
+}
+
+// Opcional: ejecútalo desde el editor si alguna vez quieres forzar
+// que la próxima lectura vuelva a mirar el Sheet.
+function limpiarCache() {
+  invalidarCache_();
+  SpreadsheetApp.getActiveSpreadsheet().toast('Caché invalidada.');
 }
 
 /* ════════════════════════════════════════════════════════════
