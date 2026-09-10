@@ -21,36 +21,62 @@
   const loading  = $('#loading');
 
   // ------------------------------------------------------------
+  // Caché local por mes (stale-while-revalidate): Apps Script gratuito
+  // puede tardar 3-18s en responder (variable, no lo controlamos). Para que
+  // la app no se sienta congelada, se muestra YA el último dato conocido de
+  // ese mes (si existe) mientras se refresca en segundo plano.
+  // ------------------------------------------------------------
+  const CacheDash = {
+    _key(mes) { return 'fm_cache_dash_' + mes; },
+    get(mes) { try { return JSON.parse(localStorage.getItem(this._key(mes))); } catch (e) { return null; } },
+    set(mes, d) { try { localStorage.setItem(this._key(mes), JSON.stringify(d)); } catch (e) { /* localStorage lleno: ignorar */ } },
+  };
+
+  // ------------------------------------------------------------
   // Carga principal
   // ------------------------------------------------------------
   async function cargar() {
     if (!Conexion.configurada()) { abrirConfig(); return; }
-    loading.hidden = false;
+
+    const mesDeEstaCarga = mesActual; // por si cambia de mes mientras esto sigue en vuelo
+    const cache = CacheDash.get(mesDeEstaCarga);
+    if (cache) {
+      aplicarDatosDashboard(cache); // instantáneo: se ve algo YA, aunque esté desactualizado
+    } else {
+      loading.hidden = false; // sin nada que mostrar todavía: sí bloquear con el spinner
+    }
+
     try {
       // UNA sola llamada al backend (antes eran 5 en paralelo: Apps Script a
       // veces rechaza tantas invocaciones simultáneas y devuelve HTML de error
       // en vez de JSON). El backend hace una única lectura de la hoja y arma
       // todo: transacciones del mes, resumen, metas, saldo y ventana de recurrentes.
-      const ventanaRecurrentes = mesesAnteriores(mesActual, 3).join(',');
-      const d = await Sheets.dashboard(mesActual, ventanaRecurrentes);
-      const txs = d.tx, resumen = d.resumen, serverMetas = d.metas;
-      txMes = txs;
-      pagina = 1;
-      saldoTotalActual = typeof d.saldo === 'number' ? d.saldo : null;
-      recurrentesSet = calcularRecurrentes(d.txsRecientes);
-      await sincronizarMetas(serverMetas);
-      renderSaldoTotal(saldoTotalActual);
-      renderKPIs(txs, resumen);
-      renderAlertas(txs);
-      Charts.renderDonut($('#chartDonut'), gastosPorCategoria(txs));
-      Charts.renderBar($('#chartBar'), resumen, saldoTotalActual);
-      renderTabla();
-      renderMetas(resumen);
+      const ventanaRecurrentes = mesesAnteriores(mesDeEstaCarga, 3).join(',');
+      const d = await Sheets.dashboard(mesDeEstaCarga, ventanaRecurrentes);
+      CacheDash.set(mesDeEstaCarga, d);
+      await sincronizarMetas(d.metas);
+      if (mesActual === mesDeEstaCarga) aplicarDatosDashboard(d); // sigue en el mismo mes: refresca con datos frescos
     } catch (err) {
-      mostrarToast('✗ Error al cargar: ' + err.message, 'error', 4000);
+      if (!cache) mostrarToast('✗ Error al cargar: ' + err.message, 'error', 4000);
+      // si había caché, se queda mostrando eso — mejor un dato viejo que una pantalla rota
     } finally {
       loading.hidden = true;
     }
+  }
+
+  function aplicarDatosDashboard(d) {
+    const txs = d.tx, resumen = d.resumen;
+    txMes = txs;
+    pagina = 1;
+    saldoTotalActual = typeof d.saldo === 'number' ? d.saldo : null;
+    recurrentesSet = calcularRecurrentes(d.txsRecientes);
+    renderSaldoTotal(saldoTotalActual);
+    renderKPIs(txs, resumen);
+    renderAlertas(txs);
+    Charts.renderDonut($('#chartDonut'), gastosPorCategoria(txs));
+    Charts.renderBar($('#chartBar'), resumen, saldoTotalActual);
+    renderTabla();
+    renderMetas(resumen);
   }
 
   // ------------------------------------------------------------
