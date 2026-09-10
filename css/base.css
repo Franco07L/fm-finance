@@ -164,14 +164,15 @@ input, select, textarea {
 /* Botón cerrar (X) en overlays (config / metas) */
 .cfg-card { position: relative; }
 .cfg-x {
-  position: absolute; top: 12px; right: 12px;
+  position: absolute; top: 12px; right: 12px; z-index: 3;
   width: 32px; height: 32px; border-radius: var(--radius-sm);
-  background: var(--bg-secondary); border: 1px solid var(--border);
-  color: var(--text-secondary); font-size: 13px; line-height: 1;
+  background: var(--bg-primary); border: 1px solid var(--border);
+  color: var(--text-primary); font-size: 13px; line-height: 1;
   display: grid; place-items: center;
-  transition: color .15s, border-color .15s;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+  transition: color .15s, border-color .15s, background .15s;
 }
-.cfg-x:hover { color: var(--accent-pink); border-color: var(--accent-pink); }
+.cfg-x:hover { color: var(--accent-pink); border-color: var(--accent-pink); background: var(--bg-secondary); }
 
 /* Scrollbar */
 ::-webkit-scrollbar { width: 10px; height: 10px; }
