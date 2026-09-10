@@ -68,8 +68,11 @@ function doPost(e) {
 
 // ─────────────────────────────────────────────────────────────
 // 3) LECTURA — la app pide datos con un GET
-//    ?action=read&token=XXX            -> ultimas 200 (o de un mes con &mes=2026-06)
+//    ?action=read&token=XXX            -> ultimas 200
+//    ?action=read&token=XXX&mes=2026-06            -> un mes
+//    ?action=read&token=XXX&mes=2026-07,2026-08,2026-09  -> varios meses (CSV), sin tope de 200
 //    ?action=summary&token=XXX         -> totales de los ultimos 6 meses
+//    ?action=balance&token=XXX         -> saldo acumulado de TODO el historial
 // ─────────────────────────────────────────────────────────────
 function doGet(e) {
   try {
@@ -82,6 +85,8 @@ function doGet(e) {
     if (action === 'summary') return json({ ok: true, data: resumen6Meses(sheet) });
 
     if (action === 'metas') return json({ ok: true, data: leerMetasGuardadas() });
+
+    if (action === 'balance') return json({ ok: true, data: { saldo: saldoTotal(sheet) } });
 
     // action === 'read'
     return json({ ok: true, data: leerTransacciones(sheet, p.mes) });
@@ -97,9 +102,26 @@ function leerTransacciones(sheet, mes) {
   const rows = sheet.getDataRange().getValues();
   rows.shift(); // quita encabezados
   let txs = rows.map(filaAObjeto).filter(t => t.id); // descarta filas vacias
-  if (mes) txs = txs.filter(t => t.mes === mes);
+  if (mes) {
+    const meses = String(mes).split(','); // soporta "2026-06" o "2026-07,2026-08,2026-09"
+    txs = txs.filter(t => meses.indexOf(t.mes) !== -1);
+  }
   txs.reverse(); // mas recientes primero
   return mes ? txs : txs.slice(0, 200);
+}
+
+// Suma TODO el historial (ingresos - gastos) recorriendo la hoja una sola vez.
+// Barato: Apps Script procesa miles de filas de sobra dentro del timeout.
+function saldoTotal(sheet) {
+  const rows = sheet.getDataRange().getValues();
+  rows.shift();
+  let saldo = 0;
+  rows.forEach(r => {
+    if (!r[0]) return; // fila vacia
+    const monto = Number(r[6]) || 0;
+    saldo += (r[3] === 'ingreso') ? monto : -monto;
+  });
+  return saldo;
 }
 
 function resumen6Meses(sheet) {

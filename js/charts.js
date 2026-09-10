@@ -60,11 +60,14 @@ const Charts = {
   },
 
   /**
-   * Barras: últimos meses, ingresos vs gastos.
+   * Barras (ingresos/gastos) + línea de saldo acumulado (trayectoria), últimos meses.
    * @param {HTMLCanvasElement} canvas
    * @param {Array} meses  [{mes:'2026-06', ingreso, gasto}, ...]
+   * @param {number|null} saldoActual  Saldo total AHORA (de Sheets.balance()).
+   *   Se usa para anclar la línea: el último punto de la trayectoria coincide
+   *   con el saldo real, y se retrocede restando los deltas de cada mes.
    */
-  renderBar(canvas, meses) {
+  renderBar(canvas, meses, saldoActual) {
     const labels = meses.map(m => {
       const [y, mm] = m.mes.split('-');
       return MESES_ES[Number(mm) - 1].slice(0, 3) + " '" + y.slice(2);
@@ -74,15 +77,35 @@ const Charts = {
 
     if (!meses.length) { this._mensajeVacio(canvas, 'Aún sin historial'); return; }
 
+    const datasets = [
+      { type: 'bar', label: 'Ingresos', data: meses.map(m => m.ingreso), backgroundColor: '#00D4FF', borderRadius: 5, maxBarThickness: 26, order: 2 },
+      { type: 'bar', label: 'Gastos',   data: meses.map(m => m.gasto),   backgroundColor: '#FF6B9D', borderRadius: 5, maxBarThickness: 26, order: 2 },
+    ];
+
+    let trayectoria = null;
+    if (typeof saldoActual === 'number') {
+      const sumaDeltas = meses.reduce((a, m) => a + (m.ingreso - m.gasto), 0);
+      let acumulado = saldoActual - sumaDeltas; // saldo justo ANTES del primer mes mostrado
+      trayectoria = meses.map(m => (acumulado += (m.ingreso - m.gasto)));
+      datasets.push({
+        type: 'line', label: 'Saldo acumulado', data: trayectoria,
+        borderColor: '#00FF88', backgroundColor: '#00FF88', borderWidth: 2,
+        borderDash: [4, 3], pointRadius: 3, pointBackgroundColor: '#00FF88',
+        tension: 0.3, yAxisID: 'y1', order: 1,
+      });
+    }
+
+    const scales = {
+      x: { grid: { display: false } },
+      y: { beginAtZero: true, ticks: { callback: (v) => 'S/ ' + v } },
+    };
+    if (trayectoria) {
+      scales.y1 = { position: 'right', grid: { display: false }, ticks: { color: '#00FF88', callback: (v) => 'S/ ' + v } };
+    }
+
     this._bar = new Chart(canvas, {
       type: 'bar',
-      data: {
-        labels,
-        datasets: [
-          { label: 'Ingresos', data: meses.map(m => m.ingreso), backgroundColor: '#00D4FF', borderRadius: 5, maxBarThickness: 26 },
-          { label: 'Gastos',   data: meses.map(m => m.gasto),   backgroundColor: '#FF6B9D', borderRadius: 5, maxBarThickness: 26 },
-        ],
-      },
+      data: { labels, datasets },
       options: {
         responsive: true,
         maintainAspectRatio: false,
@@ -90,10 +113,7 @@ const Charts = {
           legend: { position: 'top', align: 'end' },
           tooltip: { callbacks: { label: (c) => ` ${c.dataset.label}: ${fmtMoneda(c.parsed.y)}` } },
         },
-        scales: {
-          x: { grid: { display: false } },
-          y: { beginAtZero: true, ticks: { callback: (v) => 'S/ ' + v } },
-        },
+        scales,
       },
     });
   },

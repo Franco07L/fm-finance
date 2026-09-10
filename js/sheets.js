@@ -31,6 +31,7 @@ const Sheets = {
 
   leer(mes)  { return this._get(mes ? { action: 'read', mes } : { action: 'read' }); },
   resumen()  { return this._get({ action: 'summary' }); },
+  balance()  { return this._get({ action: 'balance' }); }, // { saldo }: acumulado de TODO el historial
   crear(tx)  { return this._post(Object.assign({ accion: 'crear' }, tx)); },
   borrar(id) { return this._post({ accion: 'borrar', id }); },
 

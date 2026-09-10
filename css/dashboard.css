@@ -45,6 +45,18 @@
 /* ---------- Layout ---------- */
 .dash-main { max-width: 1240px; margin: 0 auto; padding: 18px; display: flex; flex-direction: column; gap: 18px; }
 
+/* ---------- Saldo total (persistente) ---------- */
+.saldo-banner {
+  display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;
+  padding: 18px 22px;
+  background: linear-gradient(135deg, rgba(0,255,136,0.08), rgba(0,212,255,0.05));
+  border-color: rgba(0,255,136,0.3);
+}
+.saldo-left { display: flex; flex-direction: column; gap: 4px; }
+.saldo-label { font-family: var(--font-mono); font-size: 12px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.06em; }
+.saldo-val { font-size: 30px; font-weight: 700; color: var(--accent-green); text-shadow: 0 0 20px rgba(0,255,136,0.4); }
+.saldo-hint { font-family: var(--font-mono); font-size: 11px; color: var(--text-muted); }
+
 /* ---------- KPIs ---------- */
 .kpi-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
 .kpi { padding: 14px; display: flex; flex-direction: column; align-items: flex-start; gap: 9px; min-width: 0; }
@@ -54,6 +66,12 @@
 .kpi-val[data-color="green"] { color: var(--accent-green); }
 .kpi-val[data-color="pink"]  { color: var(--accent-pink); }
 .kpi-val[data-color="cyan"]  { color: var(--accent-cyan); }
+
+/* Fase 5: delta vs. mes anterior. Fase 3: nota de gastos fijos descontados. */
+.kpi-delta { font-size: 11px; display: block; margin-top: 1px; }
+.kpi-delta.good { color: var(--accent-green); }
+.kpi-delta.bad  { color: var(--accent-pink); }
+.kpi-nota { font-size: 10px; color: var(--text-muted); display: block; margin-top: 1px; }
 
 /* Ícono KPI con glow */
 .kpi-icon { flex: 0 0 auto; width: 42px; height: 42px; display: grid; place-items: center; border-radius: var(--radius-md); border: 1px solid var(--border); }
@@ -100,6 +118,7 @@
 .tx-info { min-width: 0; }
 .tx-desc { font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tx-fecha { font-family: var(--font-mono); font-size: 11px; color: var(--text-muted); }
+.tx-recurrente { font-size: 11px; }
 .tx-monto { font-family: var(--font-mono); font-weight: 700; font-size: 15px; white-space: nowrap; }
 .tx-del {
   width: 28px; height: 28px; border-radius: var(--radius-sm); background: transparent;

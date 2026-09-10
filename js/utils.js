@@ -9,17 +9,17 @@ const CATEGORIA_CONFIG = {
   'Honorarios Cumbra':  { color: '#00FF88', icon: '▲', tipo: 'ingreso' },
   'Beca 18':            { color: '#00D4FF', icon: '▲', tipo: 'ingreso' },
   'Otros ingresos':     { color: '#7C6FF7', icon: '▲', tipo: 'ingreso' },
-  // GASTOS
-  'Suscripciones tech': { color: '#FF6B9D', icon: '▼', tipo: 'gasto' },
-  'Transporte':         { color: '#FF6B9D', icon: '▼', tipo: 'gasto' },
-  'Gym':                { color: '#FF6B9D', icon: '▼', tipo: 'gasto' },
-  'Internet/Celular':   { color: '#FF6B9D', icon: '▼', tipo: 'gasto' },
-  'Alimentación':       { color: '#FFB800', icon: '▼', tipo: 'gasto' },
-  'Universidad':        { color: '#FFB800', icon: '▼', tipo: 'gasto' },
-  'Gaming/Ocio':        { color: '#FFB800', icon: '▼', tipo: 'gasto' },
-  'Ropa/Personal':      { color: '#FFB800', icon: '▼', tipo: 'gasto' },
-  'Emergencias':        { color: '#FF4444', icon: '▼', tipo: 'gasto' },
-  'Otro':               { color: '#8888AA', icon: '▼', tipo: 'gasto' },
+  // GASTOS — fijo:true = compromiso recurrente (se resta antes de "Disponible/día")
+  'Suscripciones tech': { color: '#FF6B9D', icon: '▼', tipo: 'gasto', fijo: true },
+  'Transporte':         { color: '#FF6B9D', icon: '▼', tipo: 'gasto', fijo: false },
+  'Gym':                { color: '#FF6B9D', icon: '▼', tipo: 'gasto', fijo: true },
+  'Internet/Celular':   { color: '#FF6B9D', icon: '▼', tipo: 'gasto', fijo: true },
+  'Alimentación':       { color: '#FFB800', icon: '▼', tipo: 'gasto', fijo: false },
+  'Universidad':        { color: '#FFB800', icon: '▼', tipo: 'gasto', fijo: true },
+  'Gaming/Ocio':        { color: '#FFB800', icon: '▼', tipo: 'gasto', fijo: false },
+  'Ropa/Personal':      { color: '#FFB800', icon: '▼', tipo: 'gasto', fijo: false },
+  'Emergencias':        { color: '#FF4444', icon: '▼', tipo: 'gasto', fijo: false },
+  'Otro':               { color: '#8888AA', icon: '▼', tipo: 'gasto', fijo: false },
 };
 
 /** Lista de nombres de categoría filtrada por tipo ('ingreso' | 'gasto'). */
@@ -30,6 +30,11 @@ function categoriasPorTipo(tipo) {
 /** Info de una categoría (color/icon/tipo), con fallback seguro. */
 function infoCategoria(nombre) {
   return CATEGORIA_CONFIG[nombre] || { color: '#8888AA', icon: '•', tipo: 'gasto' };
+}
+
+/** ¿Es un gasto "fijo" (compromiso recurrente: suscripción, gym, internet...)? */
+function esCategoriaFija(nombre) {
+  return !!(CATEGORIA_CONFIG[nombre] && CATEGORIA_CONFIG[nombre].fijo);
 }
 
 /* ---------- Formato de moneda y números ---------- */
@@ -83,6 +88,17 @@ function fechaISO(d = new Date()) {
 function diasRestantesMes(d = new Date()) {
   const ultimo = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
   return ultimo - d.getDate() + 1;
+}
+
+/** Array de n meses "YYYY-MM" terminando en (e incluyendo) yyyymm, en orden cronológico. */
+function mesesAnteriores(yyyymm, n) {
+  const out = [];
+  let [y, m] = yyyymm.split('-').map(Number);
+  for (let i = 0; i < n; i++) {
+    out.unshift(`${y}-${String(m).padStart(2, '0')}`);
+    m--; if (m < 1) { m = 12; y--; }
+  }
+  return out;
 }
 
 /* ---------- Toast compartido ---------- */

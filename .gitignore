@@ -6,3 +6,6 @@ desktop.ini
 # Editores
 .vscode/
 *.swp
+
+# Respaldos con datos financieros reales — NUNCA al repo publico
+backups/

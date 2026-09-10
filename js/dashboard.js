@@ -13,6 +13,8 @@
   let pagina = 1;
   let metas = Metas.get();   // metas de ahorro (localStorage, editables)
   let ultimoResumen = null;  // último resumen cargado (para re-render de metas)
+  let saldoTotalActual = null;   // saldo acumulado de TODO el historial (Sheets.balance)
+  let recurrentesSet = new Set(); // claves "categoria|monto" detectadas como gasto recurrente
 
   // --- Refs ---
   const mesLabel = $('#mesLabel');
@@ -25,18 +27,24 @@
     if (!Conexion.configurada()) { abrirConfig(); return; }
     loading.hidden = false;
     try {
-      const [txs, resumen, serverMetas] = await Promise.all([
+      const ventanaRecurrentes = mesesAnteriores(mesActual, 3).join(',');
+      const [txs, resumen, serverMetas, saldoData, txsRecientes] = await Promise.all([
         Sheets.leer(mesActual),
         Sheets.resumen(),
         Sheets.leerMetas().catch(() => undefined), // undefined=sin red; null=backend vacío; array=datos
+        Sheets.balance().catch(() => null),
+        Sheets.leer(ventanaRecurrentes).catch(() => []),
       ]);
       txMes = txs;
       pagina = 1;
+      saldoTotalActual = (saldoData && typeof saldoData.saldo === 'number') ? saldoData.saldo : null;
+      recurrentesSet = calcularRecurrentes(txsRecientes);
       await sincronizarMetas(serverMetas);
-      renderKPIs(txs);
+      renderSaldoTotal(saldoTotalActual);
+      renderKPIs(txs, resumen);
       renderAlertas(txs);
       Charts.renderDonut($('#chartDonut'), gastosPorCategoria(txs));
-      Charts.renderBar($('#chartBar'), resumen);
+      Charts.renderBar($('#chartBar'), resumen, saldoTotalActual);
       renderTabla();
       renderMetas(resumen);
     } catch (err) {
@@ -44,6 +52,33 @@
     } finally {
       loading.hidden = true;
     }
+  }
+
+  // ------------------------------------------------------------
+  // Fase 1 — Saldo total (persistente, independiente del mes)
+  // ------------------------------------------------------------
+  function renderSaldoTotal(saldo) {
+    const el = $('#saldoTotalVal');
+    if (!el) return;
+    if (typeof saldo !== 'number') { el.textContent = '—'; return; }
+    animarMoneda(el, saldo);
+  }
+
+  // ------------------------------------------------------------
+  // Fase 4 — Detección heurística de gastos recurrentes (sin IA)
+  // Si una misma categoría+monto aparece en 2 de los últimos 3 meses,
+  // se considera "recurrente" (suscripción, gym, internet...).
+  // ------------------------------------------------------------
+  function calcularRecurrentes(txs) {
+    const porClave = {};
+    (txs || []).forEach((t) => {
+      if (t.tipo !== 'gasto') return;
+      const clave = `${t.categoria}|${Math.round(t.monto)}`;
+      (porClave[clave] || (porClave[clave] = new Set())).add(t.mes);
+    });
+    const set = new Set();
+    Object.entries(porClave).forEach(([clave, meses]) => { if (meses.size >= 2) set.add(clave); });
+    return set;
   }
 
   const PEND_METAS = 'fm_metas_pendiente';
@@ -79,15 +114,26 @@
   // ------------------------------------------------------------
   // KPIs
   // ------------------------------------------------------------
-  function renderKPIs(txs) {
+  function renderKPIs(txs, resumen) {
     const ingresos = sumar(txs, 'ingreso');
     const gastos   = sumar(txs, 'gasto');
     const neto     = ingresos - gastos;
 
     const esMesActual = mesActual === mesActualYYYYMM();
-    const totalPpto = Object.values(CONFIG.PRESUPUESTO).reduce((a, b) => a + b, 0);
+
+    // Fase 3: "Disponible/día" solo sobre presupuesto VARIABLE (descuenta los fijos:
+    // suscripciones/gym/internet/universidad ya están comprometidos, no son "para gastar hoy").
+    const porCat = gastosPorCategoria(txs);
+    let presupuestoVariable = 0, gastadoVariable = 0;
+    Object.entries(CONFIG.PRESUPUESTO).forEach(([cat, limite]) => {
+      if (esCategoriaFija(cat)) return;
+      presupuestoVariable += limite;
+      gastadoVariable += (porCat[cat] || 0);
+    });
+    const gastadoFijo = gastos - Object.keys(porCat).filter(c => !esCategoriaFija(c)).reduce((a, c) => a + porCat[c], 0);
+
     const dias = esMesActual ? diasRestantesMes() : 0;
-    const porDia = esMesActual && dias > 0 ? Math.max(0, totalPpto - gastos) / dias : null;
+    const porDia = esMesActual && dias > 0 ? Math.max(0, presupuestoVariable - gastadoVariable) / dias : null;
 
     animarMoneda($('#kpiIngresos'), ingresos);
     animarMoneda($('#kpiGastos'), gastos);
@@ -97,6 +143,36 @@
     if (porDia === null) { $('#kpiPorDia').textContent = '—'; }
     else { animarMoneda($('#kpiPorDia'), porDia); }
     $('#kpiDias').textContent = esMesActual ? dias : '—';
+
+    const nota = $('#kpiPorDiaNota');
+    if (nota) nota.textContent = (porDia !== null && gastadoFijo > 0) ? `sin contar ${fmtMoneda(gastadoFijo)} en fijos` : '';
+
+    // Fase 5: comparación vs. mes anterior (usa el resumen de 6 meses, ya cargado)
+    renderDelta('#kpiIngresosDelta', resumen, 'ingreso', true);
+    renderDelta('#kpiGastosDelta', resumen, 'gasto', false);
+  }
+
+  // masEsMejor: true si un aumento es bueno (ingresos), false si un aumento es malo (gastos).
+  function deltaVsMesAnterior(resumen, mes, campo) {
+    if (!resumen || !resumen.length) return null;
+    const idx = resumen.findIndex(m => m.mes === mes);
+    if (idx <= 0) return null; // sin mes anterior en la ventana de 6 meses
+    const actual = resumen[idx][campo];
+    const anterior = resumen[idx - 1][campo];
+    if (!anterior) return null; // evita division por cero / ruido con datos incompletos
+    return ((actual - anterior) / anterior) * 100;
+  }
+
+  function renderDelta(selector, resumen, campo, masEsMejor) {
+    const el = $(selector);
+    if (!el) return;
+    const d = deltaVsMesAnterior(resumen, mesActual, campo);
+    if (d === null) { el.hidden = true; return; }
+    const sube = d >= 0;
+    const bueno = sube === masEsMejor;
+    el.hidden = false;
+    el.textContent = `${sube ? '▲' : '▼'} ${Math.abs(Math.round(d))}% vs mes ant.`;
+    el.className = 'kpi-delta mono ' + (bueno ? 'good' : 'bad');
   }
 
   // ------------------------------------------------------------
@@ -146,11 +222,14 @@
       const signo = t.tipo === 'ingreso' ? '+' : '−';
       const clase = t.tipo === 'ingreso' ? 'monto-ingreso' : 'monto-gasto';
       const bg = info.color + '22';
+      const claveRec = `${t.categoria}|${Math.round(t.monto)}`;
+      const esRecurrente = t.tipo === 'gasto' && recurrentesSet.has(claveRec);
+      const badgeRec = esRecurrente ? ' <span class="tx-recurrente" title="Gasto recurrente detectado (se repite mes a mes)">🔁</span>' : '';
       return `
         <div class="tx-row" data-id="${t.id}">
           <span class="tx-badge" style="background:${bg};color:${info.color}">${info.icon} ${t.categoria}</span>
           <span class="tx-info">
-            <span class="tx-desc">${t.descripcion || '<span style="color:var(--text-muted)">—</span>'}</span>
+            <span class="tx-desc">${t.descripcion || '<span style="color:var(--text-muted)">—</span>'}${badgeRec}</span>
             <span class="tx-fecha">${t.fecha}</span>
           </span>
           <span class="tx-monto ${clase}">${signo} ${fmtMoneda(t.monto).replace('S/ ', '')}</span>
