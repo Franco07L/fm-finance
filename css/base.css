@@ -166,10 +166,10 @@ input, select, textarea {
    circular para no chocar con la esquina redondeada del contenedor. */
 .cfg-card { position: relative; }
 .cfg-x {
-  position: absolute; top: 10px; right: 10px; z-index: 3;
-  width: 26px; height: 26px; border-radius: 50%;
+  position: absolute; top: 16px; right: 16px; z-index: 3;
+  width: 24px; height: 24px; border-radius: 50%;
   background: transparent; border: none;
-  color: var(--text-muted); font-size: 12px; line-height: 1;
+  color: var(--text-muted); font-size: 11px; line-height: 1;
   display: grid; place-items: center;
   transition: color .15s, background .15s;
 }

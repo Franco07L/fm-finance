@@ -6,7 +6,7 @@
    - Sube CACHE_VERSION cuando cambies archivos para forzar refresco.
    ============================================================ */
 
-const CACHE_VERSION = 'fm-finance-v12';
+const CACHE_VERSION = 'fm-finance-v13';
 
 const APP_SHELL = [
   './',
