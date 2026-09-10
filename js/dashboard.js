@@ -302,6 +302,16 @@
     renderTabla();
     mostrarToast('✓ Borrado', 'ok');
 
+    // La caché LOCAL (localStorage) todavía tiene la tx borrada — si se
+    // recarga la página antes de que termine el POST, por un instante se
+    // vería otra vez. La sacamos ya mismo del snapshot local guardado.
+    const cacheado = CacheDash.get(mesActual);
+    if (cacheado && Array.isArray(cacheado.tx)) {
+      cacheado.tx = cacheado.tx.filter(t => t.id !== id);
+      if (typeof saldoTotalActual === 'number') cacheado.saldo = saldoTotalActual;
+      CacheDash.set(mesActual, cacheado);
+    }
+
     try {
       // Misma ventana que usa cargar(): el backend, con el Sheet ya abierto
       // para borrar, precalienta la caché con esta clave exacta — así la
