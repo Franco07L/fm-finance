@@ -1,131 +1,110 @@
 /* ============================================================
-   FM_FINANCE — charts.js
-   Gráficos con Chart.js 4 (tema oscuro global).
+   FM_FINANCE — charts.js  (versión liviana)
+   Gráficos en HTML/CSS/SVG puro: sin Chart.js (≈200 KB menos),
+   funcionan igual sin conexión y no necesitan <canvas>.
+   Misma API que antes: Charts.renderDonut(el, porCategoria)
+                        Charts.renderBar(el, meses, saldoActual)
    ============================================================ */
 
-if (window.Chart) {
-  Chart.defaults.color = '#8888AA';
-  Chart.defaults.borderColor = 'rgba(124,111,247,0.15)';
-  Chart.defaults.font.family = "'JetBrains Mono', monospace";
-  Chart.defaults.font.size = 11;
-  Chart.defaults.plugins.legend.labels.usePointStyle = true;
-  Chart.defaults.plugins.legend.labels.boxWidth = 8;
-  Chart.defaults.plugins.legend.labels.padding = 14;
-}
-
 const Charts = {
-  _donut: null,
-  _bar: null,
+  /** Dona de gastos por categoría. `el` es un contenedor (<div>). */
+  renderDonut(el, porCategoria) {
+    const grupos = Object.entries(porCategoria).sort((a, b) => b[1] - a[1]);
+    const total = grupos.reduce((a, [, v]) => a + v, 0);
+    const cuenta = document.getElementById('catCount');
+    if (cuenta) cuenta.textContent = `${grupos.length} categoría${grupos.length === 1 ? '' : 's'}`;
 
-  /**
-   * Dona de gastos por categoría.
-   * @param {HTMLCanvasElement} canvas
-   * @param {Object} porCategoria  { 'Alimentación': 320, ... }
-   */
-  renderDonut(canvas, porCategoria) {
-    const labels = Object.keys(porCategoria);
-    const data = labels.map(l => porCategoria[l]);
-    const colors = labels.map(l => infoCategoria(l).color);
+    if (!grupos.length) {
+      el.innerHTML = `<div class="empty-state">${icono('chart')}<strong>Todo empieza con un registro</strong><p>Tu distribución aparecerá cuando registres un gasto este mes.</p></div>`;
+      return;
+    }
 
-    if (this._donut) this._donut.destroy();
+    let acc = 0;
+    const tramos = grupos.map(([nombre, v]) => {
+      const ini = acc / total * 100; acc += v;
+      return `${infoCategoria(nombre).color} ${ini.toFixed(2)}% ${(acc / total * 100).toFixed(2)}%`;
+    }).join(',');
 
-    if (!labels.length) { this._mensajeVacio(canvas, 'Sin gastos este mes'); return; }
-
-    this._donut = new Chart(canvas, {
-      type: 'doughnut',
-      data: {
-        labels,
-        datasets: [{
-          data,
-          backgroundColor: colors,
-          borderColor: '#0D0D1A',
-          borderWidth: 3,
-          hoverOffset: 8,
-        }],
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        cutout: '62%',
-        plugins: {
-          legend: { position: 'right', labels: { color: '#8888AA' } },
-          tooltip: {
-            callbacks: {
-              label: (c) => ` ${c.label}: ${fmtMoneda(c.parsed)}`,
-            },
-          },
-        },
-      },
-    });
+    el.innerHTML = `
+      <div class="category-body">
+        <div class="donut" style="background:conic-gradient(${tramos})" role="img"
+             aria-label="Gasto total ${esc(fmtMoneda(total))}; ${grupos.length} categorías">
+          <div class="donut-center"><b class="money">${esc(fmtMoneda(total))}</b>
+            <small>${grupos.length === 1 ? '100 % · una categoría' : 'Total del mes'}</small></div>
+        </div>
+        <div class="category-legend">
+          ${grupos.map(([nombre, v]) => `
+            <div class="category-line" style="--c:${infoCategoria(nombre).color}">
+              <span class="category-dot"></span>
+              <span class="cat-name">${esc(nombre)}</span>
+              <span class="category-amount money">${esc(fmtMoneda(v))}</span>
+              <span class="category-pct">${Math.round(v / total * 100)}%</span>
+            </div>`).join('')}
+        </div>
+      </div>`;
   },
 
   /**
-   * Barras (ingresos/gastos) + línea de saldo acumulado (trayectoria), últimos meses.
-   * @param {HTMLCanvasElement} canvas
+   * Barras ingresos/gastos por mes + trayectoria del saldo acumulado.
+   * @param {HTMLElement} el
    * @param {Array} meses  [{mes:'2026-06', ingreso, gasto}, ...]
-   * @param {number|null} saldoActual  Saldo total AHORA (de Sheets.balance()).
-   *   Se usa para anclar la línea: el último punto de la trayectoria coincide
-   *   con el saldo real, y se retrocede restando los deltas de cada mes.
+   * @param {number|null} saldoActual  Saldo total AHORA: ancla la trayectoria
+   *   (el último punto = saldo real; hacia atrás se restan los deltas de cada mes).
    */
-  renderBar(canvas, meses, saldoActual) {
-    const labels = meses.map(m => {
-      const [y, mm] = m.mes.split('-');
-      return MESES_ES[Number(mm) - 1].slice(0, 3) + " '" + y.slice(2);
-    });
+  renderBar(el, meses, saldoActual) {
+    const nota = document.getElementById('histCount');
+    if (nota) nota.textContent = `Últimos 6 meses · ${meses.length} ${meses.length === 1 ? 'mes disponible' : 'meses disponibles'}`;
 
-    if (this._bar) this._bar.destroy();
+    if (!meses.length) {
+      el.innerHTML = `<div class="empty-state">${icono('calendar')}<strong>Tu historia está por empezar</strong><p>No hay movimientos en esta ventana de seis meses.</p></div>`;
+      return;
+    }
 
-    if (!meses.length) { this._mensajeVacio(canvas, 'Aún sin historial'); return; }
+    const max = Math.max(1, ...meses.map(m => Math.max(m.ingreso, m.gasto)));
+    const paso = Math.pow(10, Math.floor(Math.log10(max)));          // escala "redonda"
+    const techo = Math.ceil(max / paso / 4) * paso * 4;              // múltiplo de 4 pasos
+    const num = (v) => Number(v).toLocaleString('es-PE', { maximumFractionDigits: 0 });
+    const abrev = (m) => MESES_ES[Number(m.split('-')[1]) - 1].slice(0, 3);
 
-    const datasets = [
-      { type: 'bar', label: 'Ingresos', data: meses.map(m => m.ingreso), backgroundColor: '#00D4FF', borderRadius: 5, maxBarThickness: 26, order: 2 },
-      { type: 'bar', label: 'Gastos',   data: meses.map(m => m.gasto),   backgroundColor: '#FF6B9D', borderRadius: 5, maxBarThickness: 26, order: 2 },
-    ];
+    const barras = meses.map((m) => `
+      <div class="bar-group" tabindex="0" title="${esc(nombreMes(m.mes))} · Ingresos ${esc(fmtMoneda(m.ingreso))} · Gastos ${esc(fmtMoneda(m.gasto))}"
+           aria-label="${esc(nombreMes(m.mes))}, ingresos ${esc(fmtMoneda(m.ingreso))}, gastos ${esc(fmtMoneda(m.gasto))}">
+        <div class="bar ${m.ingreso ? '' : 'zero'}" style="height:${(m.ingreso / techo * 100).toFixed(1)}%"></div>
+        <div class="bar expense ${m.gasto ? '' : 'zero'}" style="height:${(m.gasto / techo * 100).toFixed(1)}%"></div>
+      </div>`).join('');
 
-    let trayectoria = null;
+    // Trayectoria del saldo (línea SVG)
+    let tendencia = '';
     if (typeof saldoActual === 'number') {
-      const sumaDeltas = meses.reduce((a, m) => a + (m.ingreso - m.gasto), 0);
-      let acumulado = saldoActual - sumaDeltas; // saldo justo ANTES del primer mes mostrado
-      trayectoria = meses.map(m => (acumulado += (m.ingreso - m.gasto)));
-      datasets.push({
-        type: 'line', label: 'Saldo acumulado', data: trayectoria,
-        borderColor: '#00FF88', backgroundColor: '#00FF88', borderWidth: 2,
-        borderDash: [4, 3], pointRadius: 3, pointBackgroundColor: '#00FF88',
-        tension: 0.3, yAxisID: 'y1', order: 1,
-      });
+      let ac = saldoActual - meses.reduce((a, m) => a + (m.ingreso - m.gasto), 0);
+      const serie = meses.map((m) => ({ mes: m.mes, saldo: (ac += (m.ingreso - m.gasto)) }));
+      const vals = serie.map(s => s.saldo);
+      const mn = Math.min(...vals), mx = Math.max(...vals), rango = (mx - mn) || 1;
+      const x = (i) => serie.length === 1 ? 200 : 50 + i * (300 / (serie.length - 1));
+      const y = (v) => 22 + (1 - (v - mn) / rango) * 26;
+      const puntos = serie.map((s, i) => `${x(i).toFixed(1)},${y(s.saldo).toFixed(1)}`).join(' ');
+      tendencia = `
+        <div class="balance-trend">
+          <div class="trend-head"><span>Saldo acumulado</span><b class="green money">${esc(fmtMoneda(serie[serie.length - 1].saldo))}</b></div>
+          <svg class="trend-svg" viewBox="0 0 400 78" role="img"
+               aria-label="Saldo acumulado por mes: ${esc(serie.map(s => nombreMes(s.mes) + ', ' + fmtMoneda(s.saldo)).join('; '))}">
+            ${serie.length > 1 ? `<polyline fill="none" stroke="#00ffb0" stroke-width="1.8" points="${puntos}"/>` : ''}
+            ${serie.map((s, i) => `
+              <circle cx="${x(i).toFixed(1)}" cy="${y(s.saldo).toFixed(1)}" r="3.5" fill="#00ffb0"/>
+              <text class="value-label" x="${x(i).toFixed(1)}" y="${(y(s.saldo) - 9).toFixed(1)}" text-anchor="middle">${esc(fmtMoneda(s.saldo))}</text>
+              <text x="${x(i).toFixed(1)}" y="68" text-anchor="middle">${abrev(s.mes)}</text>`).join('')}
+          </svg>
+        </div>`;
     }
 
-    const scales = {
-      x: { grid: { display: false } },
-      y: { beginAtZero: true, ticks: { callback: (v) => 'S/ ' + v } },
-    };
-    if (trayectoria) {
-      scales.y1 = { position: 'right', grid: { display: false }, ticks: { color: '#00FF88', callback: (v) => 'S/ ' + v } };
-    }
-
-    this._bar = new Chart(canvas, {
-      type: 'bar',
-      data: { labels, datasets },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-          legend: { position: 'top', align: 'end' },
-          tooltip: { callbacks: { label: (c) => ` ${c.dataset.label}: ${fmtMoneda(c.parsed.y)}` } },
-        },
-        scales,
-      },
-    });
-  },
-
-  _mensajeVacio(canvas, texto) {
-    const ctx = canvas.getContext('2d');
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.save();
-    ctx.fillStyle = '#444466';
-    ctx.font = "13px 'JetBrains Mono', monospace";
-    ctx.textAlign = 'center';
-    ctx.fillText(texto, canvas.width / 2, canvas.height / 2);
-    ctx.restore();
+    el.innerHTML = `
+      <span class="plot-unit">Importes en S/</span>
+      <div class="plot-area" role="img" aria-label="Comparación mensual de ingresos y gastos">
+        <div class="y-scale">${[4, 3, 2, 1, 0].map(i => `<span>${num(techo * i / 4)}</span>`).join('')}</div>
+        <div class="bar-plot">${barras}</div>
+      </div>
+      <div class="x-labels">${meses.map(m => `<span>${abrev(m.mes)} ${m.mes.slice(2, 4)}</span>`).join('')}</div>
+      ${tendencia}
+      <p class="chart-caption">${meses.length < 6 ? 'Se muestran solo los meses con movimientos.' : 'Historial de los seis últimos meses.'}</p>`;
   },
 };

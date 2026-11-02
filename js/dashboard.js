@@ -176,12 +176,25 @@
     animarMoneda($('#kpiNeto'), neto);
     $('#kpiNeto').dataset.color = neto >= 0 ? 'green' : 'pink';
 
-    if (porDia === null) { $('#kpiPorDia').textContent = '—'; }
+    if (porDia === null) { $('#kpiPorDia').textContent = '—'; $('#kpiPorDia')._v = undefined; }
     else { animarMoneda($('#kpiPorDia'), porDia); }
-    $('#kpiDias').textContent = esMesActual ? dias : '—';
+
+    // "N días restantes" + barra: solo tiene sentido en el mes en curso
+    const wrap = $('#kpiDiasWrap');
+    wrap.hidden = !esMesActual;
+    if (esMesActual) {
+      const hoy = new Date();
+      const diasDelMes = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0).getDate();
+      $('#kpiDias').textContent = dias;
+      $('#kpiDiasBar').style.width = Math.max(2, Math.round(dias / diasDelMes * 100)) + '%';
+    }
 
     const nota = $('#kpiPorDiaNota');
-    if (nota) nota.textContent = (porDia !== null && gastadoFijo > 0) ? `sin contar ${fmtMoneda(gastadoFijo)} en fijos` : '';
+    if (nota) {
+      nota.textContent = porDia === null
+        ? 'Solo se calcula para el mes en curso.'
+        : 'Presupuesto variable' + (gastadoFijo > 0 ? ` · excluye ${fmtMoneda(gastadoFijo)} en fijos` : '');
+    }
 
     // Fase 5: comparación vs. mes anterior (usa el resumen de 6 meses, ya cargado)
     renderDelta('#kpiIngresosDelta', resumen, 'ingreso', true);
@@ -220,14 +233,42 @@
     const alertas = [];
     for (const [cat, limite] of Object.entries(CONFIG.PRESUPUESTO)) {
       const gastado = porCat[cat] || 0;
-      if (gastado > limite) {
-        const exceso = gastado - limite;
-        alertas.push(`⚠ ${cat}: ${fmtMoneda(gastado)} de ${fmtMoneda(limite)} (excedido ${fmtMoneda(exceso)})`);
-      }
+      if (gastado > limite) alertas.push({ cat, gastado, limite, exceso: gastado - limite });
     }
-    cont.innerHTML = alertas.map(a => `<div class="alerta">${a}</div>`).join('');
-    cont.hidden = alertas.length === 0;
+    alertas.sort((a, b) => b.exceso - a.exceso);
+
+    if (!alertas.length) {
+      cont.className = 'card metric alertas-card ok';
+      cont.removeAttribute('role'); cont.removeAttribute('tabindex'); cont.removeAttribute('aria-expanded');
+      cont.innerHTML = `<span class="metric-icon green">${icono('check')}</span>
+        <div class="metric-copy"><p class="metric-label">Sin excesos</p><p class="metric-sub">Categorías dentro del presupuesto</p></div>`;
+      return;
+    }
+    // Hay excesos: se muestra el mayor; tocar la tarjeta despliega el detalle de todos.
+    const [a0] = alertas;
+    cont.className = 'card metric alertas-card hay';
+    cont.setAttribute('role', 'button'); cont.setAttribute('tabindex', '0'); cont.setAttribute('aria-expanded', 'false');
+    cont.innerHTML = `<span class="metric-icon amber">${icono('alert')}</span>
+      <div class="metric-copy">
+        <p class="metric-label">${esc(a0.cat)}${alertas.length > 1 ? ` y ${alertas.length - 1} más` : ''}</p>
+        <p class="metric-sub">${fmtMoneda(a0.exceso)} sobre el presupuesto</p>
+      </div>
+      <ul class="alert-list" hidden>${alertas.map(a =>
+        `<li>${esc(a.cat)}: ${fmtMoneda(a.gastado)} de ${fmtMoneda(a.limite)} (excedido ${fmtMoneda(a.exceso)})</li>`).join('')}</ul>`;
   }
+
+  // Alterna el detalle de excesos (clic o Enter/Espacio sobre la tarjeta).
+  (function () {
+    const cont = $('#alertas');
+    const alternar = () => {
+      const lista = cont.querySelector('.alert-list');
+      if (!lista) return;
+      lista.hidden = !lista.hidden;
+      cont.setAttribute('aria-expanded', String(!lista.hidden));
+    };
+    cont.addEventListener('click', alternar);
+    cont.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); alternar(); } });
+  })();
 
   // ------------------------------------------------------------
   // Tabla de transacciones (paginada)
@@ -236,13 +277,13 @@
     const list = $('#txList');
     $('#txCount').textContent = `${txMes.length} este mes`;
 
+    $('.tx-columns').hidden = !txMes.length;
+    $('.tx-pager').hidden = txMes.length <= CONFIG.TX_POR_PAGINA;
+
     if (!txMes.length) {
-      list.innerHTML = `<div class="empty-illu">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M3 7l2-3h14l2 3v3H3z"/><path d="M5 10v9a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-9"/><path d="M9 13h6"/>
-        </svg>
-        <span>Sin transacciones este mes</span>
-      </div>`;
+      list.innerHTML = `<div class="empty-state">${icono('empty')}<strong>Un mes por escribir</strong>
+        <p>Aún no tienes movimientos en ${esc(nombreMes(mesActual).toLowerCase())}. Empieza con tu primer registro.</p>
+        <a href="form.html" class="primary">${icono('plus')}Registrar movimiento</a></div>`;
       $('#txPagina').textContent = '1 / 1';
       $('#txPrev').disabled = true; $('#txNext').disabled = true;
       return;
@@ -257,20 +298,18 @@
       const info = infoCategoria(t.categoria);
       const signo = t.tipo === 'ingreso' ? '+' : '−';
       const clase = t.tipo === 'ingreso' ? 'monto-ingreso' : 'monto-gasto';
-      const bg = info.color + '22';
       const claveRec = `${t.categoria}|${Math.round(t.monto)}`;
       const esRecurrente = t.tipo === 'gasto' && recurrentesSet.has(claveRec);
-      const badgeRec = esRecurrente ? ' <span class="tx-recurrente" title="Gasto recurrente detectado (se repite mes a mes)">🔁</span>' : '';
+      const badgeRec = esRecurrente ? ` <span class="tx-recurrente" title="Gasto recurrente detectado (se repite mes a mes)" aria-label="Gasto recurrente">${icono('repeat')}</span>` : '';
+      const nombre = t.descripcion || t.categoria;
       return `
-        <div class="tx-row" data-id="${t.id}">
-          <span class="tx-badge" style="background:${bg};color:${info.color}">${info.icon} ${t.categoria}</span>
-          <span class="tx-info">
-            <span class="tx-desc">${t.descripcion || '<span style="color:var(--text-muted)">—</span>'}${badgeRec}</span>
-            <span class="tx-fecha">${t.fecha}</span>
-          </span>
-          <span class="tx-monto ${clase}">${signo} ${fmtMoneda(t.monto).replace('S/ ', '')}</span>
-          <button class="tx-del" data-id="${t.id}" title="Borrar">✕</button>
-        </div>`;
+        <article class="tx-row" data-id="${esc(t.id)}">
+          <time class="tx-date" datetime="${esc(t.fecha)}">${esc(fechaCorta(t.fecha))}</time>
+          <div class="tx-category" style="--c:${info.color}">${icono(info.svg)}<span>${esc(t.categoria)}</span></div>
+          <p class="tx-desc${t.descripcion ? '' : ' vacia'}">${t.descripcion ? esc(t.descripcion) : 'Sin descripción'}${badgeRec}</p>
+          <span class="tx-monto ${clase}">${signo} ${esc(fmtMoneda(t.monto))}</span>
+          <button class="tx-del" data-id="${esc(t.id)}" title="Borrar" aria-label="Borrar ${esc(nombre)}">${icono('trash')}</button>
+        </article>`;
     }).join('');
 
     $('#txPagina').textContent = `${pagina} / ${totalPags}`;
@@ -295,6 +334,7 @@
     if (typeof saldoTotalActual === 'number') {
       saldoTotalActual += (t.tipo === 'ingreso' ? -t.monto : t.monto);
       renderSaldoTotal(saldoTotalActual);
+      renderMetas(ultimoResumen);   // "Ahorro neto acumulado" sigue al saldo
     }
     renderKPIs(txMes, ultimoResumen);
     renderAlertas(txMes);
@@ -325,48 +365,55 @@
   // ------------------------------------------------------------
   // Metas de ahorro
   // ------------------------------------------------------------
+  // Nombre del icono SVG según la meta (el color lo da .indigo para las "de equipo").
   function iconoMeta(nombre) {
-    const n = nombre.toLowerCase();
-    if (n.includes('laptop') || n.includes('pc') || n.includes('legion')) return '💻';
-    if (n.includes('emergencia') || n.includes('fondo')) return '🛡️';
-    if (n.includes('viaje') || n.includes('vacac')) return '✈️';
-    if (n.includes('auto') || n.includes('moto') || n.includes('carro')) return '🚗';
-    return '🎯';
+    const n = String(nombre).toLowerCase();
+    if (n.includes('laptop') || n.includes('pc') || n.includes('legion')) return 'laptop';
+    if (n.includes('emergencia') || n.includes('fondo')) return 'shield';
+    if (n.includes('viaje') || n.includes('vacac')) return 'plane';
+    if (n.includes('auto') || n.includes('moto') || n.includes('carro')) return 'bus';
+    return 'target';
   }
 
   function renderMetas(resumen) {
     if (resumen) ultimoResumen = resumen;
-    // "Ahorro neto acumulado" = neto de todo el historial (ingresos - gastos)
-    const ahorroTotal = (resumen || []).reduce((a, m) => a + (m.ingreso - m.gasto), 0);
+    // "Ahorro neto acumulado" = saldo de TODO el historial (si ya lo conocemos)
+    const ahorroTotal = typeof saldoTotalActual === 'number'
+      ? saldoTotalActual
+      : (resumen || []).reduce((a, m) => a + (m.ingreso - m.gasto), 0);
     const cont = $('#metasList');
 
+    let html = '';
     if (!metas.length) {
-      cont.innerHTML = `<div class="meta-empty">Aún no tienes metas. Pulsa “+ Meta” para crear una.</div>`;
-      return;
-    }
-
-    cont.innerHTML = metas.map((meta, i) => {
-      const actual = meta.actual || 0;
-      const pct = meta.objetivo > 0 ? Math.min(100, Math.round((actual / meta.objetivo) * 100)) : 0;
-      return `
-        <div class="meta" data-i="${i}">
+      html = `<div class="empty-state">${icono('shield')}<strong>Dale un destino a tu ahorro</strong>
+        <p>Crea una meta y ajusta cuánto llevas ahorrado.</p></div>`;
+    } else {
+      html = metas.map((meta, i) => {
+        const actual = meta.actual || 0;
+        const pct = meta.objetivo > 0 ? Math.min(100, Math.round((actual / meta.objetivo) * 100)) : 0;
+        const ico = iconoMeta(meta.nombre);
+        return `
+        <article class="meta" data-i="${i}">
           <div class="meta-top">
-            <span class="meta-ico">${iconoMeta(meta.nombre)}</span>
-            <span class="meta-nombre">${meta.nombre}</span>
-            <span class="meta-vals">${fmtMoneda(actual)} / ${fmtMoneda(meta.objetivo)} · <b>${pct}%</b></span>
-            <button class="meta-edit" data-edit="${i}" title="Editar meta" aria-label="Editar meta">✎</button>
+            <span class="meta-ico ${ico === 'laptop' ? 'indigo' : ''}">${icono(ico)}</span>
+            <h3 class="meta-nombre">${esc(meta.nombre)}</h3>
+            <button class="meta-edit" data-edit="${i}" title="Editar meta" aria-label="Editar ${esc(meta.nombre)}">${icono('pencil')}</button>
           </div>
-          <div class="meta-bar"><div class="meta-fill" data-pct="${pct}" style="width:0"></div></div>
-        </div>`;
-    }).join('');
-
-    if (resumen) {
-      cont.insertAdjacentHTML('beforeend',
-        `<div class="ahorro-hero">
-           <span class="label">💰 Ahorro neto acumulado</span>
-           <span class="val">${fmtMoneda(ahorroTotal)}</span>
-         </div>`);
+          <p class="meta-vals mono"><b>${fmtMoneda(actual)}</b> / ${fmtMoneda(meta.objetivo)}</p>
+          <div class="meta-progress">
+            <div class="meta-bar" role="progressbar" aria-label="${esc(meta.nombre)}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${pct}"
+                 aria-valuetext="${esc(fmtMoneda(actual))} de ${esc(fmtMoneda(meta.objetivo))}"><div class="meta-fill" data-pct="${pct}"></div></div>
+            <span class="meta-pct">${pct}%</span>
+          </div>
+          ${pct === 0 ? '<p class="meta-ayuda">Tu primer ahorro cuenta.</p>' : ''}
+        </article>`;
+      }).join('');
     }
+
+    if (resumen || typeof saldoTotalActual === 'number') {
+      html += `<div class="ahorro-hero">${icono('piggy')}<div><p class="label">Ahorro neto acumulado</p><p class="val">${fmtMoneda(ahorroTotal)}</p></div></div>`;
+    }
+    cont.innerHTML = html;
 
     cont.querySelectorAll('.meta-edit').forEach(b =>
       b.addEventListener('click', () => abrirMetaEditor(+b.dataset.edit)));
@@ -439,11 +486,7 @@
     txs.filter(t => t.tipo === 'gasto').forEach(t => { acc[t.categoria] = (acc[t.categoria] || 0) + t.monto; });
     return acc;
   }
-  function animarMoneda(el, valor) {
-    if (!window.gsap) { el.textContent = fmtMoneda(valor); return; }
-    const obj = { v: 0 };
-    gsap.to(obj, { v: valor, duration: 0.8, ease: 'power2.out', onUpdate: () => { el.textContent = fmtMoneda(obj.v); } });
-  }
+  function animarMoneda(el, valor) { animarNumero(el, valor); }
 
   // ------------------------------------------------------------
   // Navegación de mes
@@ -490,35 +533,9 @@
   });
 
   // ------------------------------------------------------------
-  // Tilt 3D (solo mouse fino, respeta reduce-motion)
-  // ------------------------------------------------------------
-  function attachTilt() {
-    if (!window.matchMedia('(hover: hover) and (pointer: fine)').matches) return;
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-    document.querySelectorAll('.tilt').forEach((el) => {
-      el.addEventListener('mousemove', (e) => {
-        const r = el.getBoundingClientRect();
-        const px = (e.clientX - r.left) / r.width - 0.5;
-        const py = (e.clientY - r.top) / r.height - 0.5;
-        el.style.setProperty('--rx', (px * 9).toFixed(2) + 'deg');
-        el.style.setProperty('--ry', (-py * 9).toFixed(2) + 'deg');
-      });
-      el.addEventListener('mouseleave', () => {
-        el.style.setProperty('--rx', '0deg');
-        el.style.setProperty('--ry', '0deg');
-      });
-    });
-  }
-
-  // ------------------------------------------------------------
   // Init
   // ------------------------------------------------------------
   mesLabel.textContent = nombreMes(mesActual);
-  if (window.gsap && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-    gsap.from('.kpi', { opacity: 0, y: 22, scale: 0.96, duration: 0.5, stagger: 0.06, ease: 'power2.out' });
-    gsap.from('.charts-grid, .tx-card, .metas-card', { opacity: 0, y: 28, duration: 0.55, stagger: 0.12, delay: 0.2, ease: 'power2.out' });
-  }
-  attachTilt();
   renderMetas(null);   // las metas son locales: se ven aunque no haya conexión
   cargar();
 })();

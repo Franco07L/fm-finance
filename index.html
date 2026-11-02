@@ -3,13 +3,13 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="theme-color" content="#7C6FF7">
+  <meta name="theme-color" content="#08080f">
   <title>FM Finance — Dashboard</title>
 
   <link rel="manifest" href="manifest.json">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 
   <link rel="stylesheet" href="css/base.css">
   <link rel="stylesheet" href="css/dashboard.css">
@@ -22,116 +22,119 @@
       <button class="cfg-x" id="btnCerrarCfg" type="button" aria-label="Cerrar" title="Cerrar">✕</button>
       <h2>Conectar tu cuenta</h2>
       <p class="cfg-help">Pega la <b>URL</b> de tu Apps Script y tu <b>token</b>. Se guardan solo en este dispositivo.</p>
-      <label>URL de la app web (termina en <span class="mono">/exec</span>)</label>
+      <label for="cfgUrl">URL de la app web (termina en <span class="mono">/exec</span>)</label>
       <input type="text" id="cfgUrl" class="inp" placeholder="https://script.google.com/macros/s/.../exec" autocomplete="off">
-      <label>Token</label>
+      <label for="cfgToken">Token</label>
       <input type="text" id="cfgToken" class="inp" placeholder="fm_..." autocomplete="off">
       <button class="btn-primary" id="btnGuardarCfg">Conectar</button>
       <p class="cfg-estado" id="cfgEstado"></p>
     </div>
   </div>
 
-  <header class="dash-header">
-    <div class="brand">
-      <span class="logo">FM</span>
-      <span class="title">Finance</span>
-    </div>
-    <div class="header-center">
-      <button class="month-nav" id="mesPrev" aria-label="Mes anterior">‹</button>
-      <span class="month-label" id="mesLabel">—</span>
-      <button class="month-nav" id="mesNext" aria-label="Mes siguiente">›</button>
-    </div>
-    <div class="header-right">
-      <a href="form.html" class="btn-add">+ Registrar</a>
-      <button class="icon-btn" id="btnRefresh" title="Actualizar" aria-label="Actualizar">↻</button>
-      <button class="icon-btn" id="btnConfig" title="Configuración" aria-label="Configuración">⚙</button>
+  <header class="app-header">
+    <div class="header-inner">
+      <a href="index.html" class="brand" aria-label="FM Finance, inicio"><b>FM</b><span>Finance</span></a>
+      <nav class="primary-nav" aria-label="Secciones">
+        <a href="#dashMain" class="active">Inicio</a>
+        <a href="#transacciones">Transacciones</a>
+        <a href="#metas">Metas</a>
+      </nav>
+      <div class="month-switch" aria-label="Mes consultado">
+        <button class="icon-button" id="mesPrev" aria-label="Mes anterior"><span data-icon="chevronLeft"></span></button>
+        <span class="month-label" id="mesLabel">—</span>
+        <button class="icon-button" id="mesNext" aria-label="Mes siguiente"><span data-icon="chevronRight"></span></button>
+      </div>
+      <a href="form.html" class="primary header-register"><span data-icon="plus"></span>Registrar</a>
+      <div class="header-tools">
+        <button class="icon-button" id="btnRefresh" title="Actualizar" aria-label="Actualizar"><span data-icon="refresh"></span></button>
+        <button class="icon-button" id="btnConfig" title="Configuración" aria-label="Configuración"><span data-icon="settings"></span></button>
+      </div>
     </div>
   </header>
 
   <main class="dash-main" id="dashMain">
 
-    <!-- Saldo total: persistente, NO depende del mes seleccionado -->
-    <section class="saldo-banner card">
-      <div class="saldo-left">
-        <span class="saldo-label">💰 Saldo total</span>
-        <span class="saldo-val mono" id="saldoTotalVal">S/ 0</span>
-      </div>
-      <span class="saldo-hint">Todo tu historial · no cambia al navegar entre meses</span>
+    <!-- Saldo total (persistente, no depende del mes) + disponible por día -->
+    <section class="hero-grid enter" aria-label="Saldo y presupuesto diario">
+      <article class="card hero balance-card">
+        <div class="hero-label"><span data-icon="coins"></span><span>Saldo total</span></div>
+        <div class="balance-value" id="saldoTotalVal">S/ 0</div>
+        <p class="hero-note">Todo tu historial · no cambia al navegar entre meses</p>
+      </article>
+      <article class="card hero daily-card">
+        <div class="hero-label"><span data-icon="calendar"></span><span>Disponible por día</span></div>
+        <div class="daily-value" id="kpiPorDia">S/ 0</div>
+        <p class="daily-description" id="kpiPorDiaNota"></p>
+        <div class="daily-footer" id="kpiDiasWrap">
+          <span><b id="kpiDias">0</b> días restantes</span>
+          <div class="time-track" aria-hidden="true"><i id="kpiDiasBar"></i></div>
+        </div>
+      </article>
     </section>
 
-    <!-- KPIs del mes seleccionado -->
-    <section class="kpi-grid">
-      <div class="card kpi tilt">
-        <span class="kpi-icon" data-color="green"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 17 9 11 13 15 21 7"/><polyline points="15 7 21 7 21 13"/></svg></span>
-        <div class="kpi-text">
-          <span class="kpi-label">Ingresos</span>
-          <span class="kpi-val mono" id="kpiIngresos" data-color="green">S/ 0</span>
+    <!-- Métricas del mes seleccionado -->
+    <section class="metrics enter" aria-label="Resumen del mes">
+      <article class="card metric">
+        <span class="metric-icon green"><span data-icon="arrowDown"></span></span>
+        <div class="metric-copy">
+          <p class="metric-label">Ingresos</p>
+          <p class="metric-value" id="kpiIngresos" data-color="green">S/ 0</p>
           <span class="kpi-delta mono" id="kpiIngresosDelta" hidden></span>
         </div>
-      </div>
-      <div class="card kpi tilt">
-        <span class="kpi-icon" data-color="pink"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 7 9 13 13 9 21 17"/><polyline points="15 17 21 17 21 11"/></svg></span>
-        <div class="kpi-text">
-          <span class="kpi-label">Gastos</span>
-          <span class="kpi-val mono" id="kpiGastos" data-color="pink">S/ 0</span>
+      </article>
+      <article class="card metric">
+        <span class="metric-icon pink"><span data-icon="arrowUp"></span></span>
+        <div class="metric-copy">
+          <p class="metric-label">Gastos</p>
+          <p class="metric-value" id="kpiGastos" data-color="pink">S/ 0</p>
           <span class="kpi-delta mono" id="kpiGastosDelta" hidden></span>
         </div>
-      </div>
-      <div class="card kpi tilt">
-        <span class="kpi-icon" data-color="indigo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="6" width="19" height="13" rx="2.5"/><path d="M16 12.5h3"/><path d="M2.5 9.5h19"/></svg></span>
-        <div class="kpi-text"><span class="kpi-label">Neto</span><span class="kpi-val mono" id="kpiNeto">S/ 0</span></div>
-      </div>
-      <div class="card kpi tilt">
-        <span class="kpi-icon" data-color="cyan"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="M12 7v10M9.5 9.5h3.2a1.8 1.8 0 0 1 0 3.6H9.5h3.5a1.8 1.8 0 0 1 0 3.6H9.5"/></svg></span>
-        <div class="kpi-text">
-          <span class="kpi-label">Disponible / día</span>
-          <span class="kpi-val mono" id="kpiPorDia" data-color="cyan">S/ 0</span>
-          <span class="kpi-nota mono" id="kpiPorDiaNota"></span>
+      </article>
+      <article class="card metric">
+        <span class="metric-icon indigo"><span data-icon="chart"></span></span>
+        <div class="metric-copy">
+          <p class="metric-label">Neto del mes</p>
+          <p class="metric-value" id="kpiNeto">S/ 0</p>
         </div>
-      </div>
-      <div class="card kpi tilt">
-        <span class="kpi-icon" data-color="amber"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 14"/></svg></span>
-        <div class="kpi-text"><span class="kpi-label">Días restantes</span><span class="kpi-val mono" id="kpiDias">0</span></div>
-      </div>
+      </article>
+      <!-- Alertas de presupuesto (la rellena dashboard.js) -->
+      <article class="card metric alertas-card ok" id="alertas"></article>
     </section>
-
-    <!-- Alertas de presupuesto -->
-    <section id="alertas" class="alertas" hidden></section>
 
     <!-- Gráficos -->
-    <section class="charts-grid">
-      <div class="card chart-card tilt">
-        <h3><span class="h3-dot" style="background:var(--accent-amber)"></span>Gastos por categoría</h3>
-        <div class="chart-box"><canvas id="chartDonut"></canvas></div>
-      </div>
-      <div class="card chart-card tilt">
-        <h3><span class="h3-dot" style="background:var(--accent-cyan)"></span>Ingresos vs Gastos · 6 meses</h3>
-        <div class="chart-box"><canvas id="chartBar"></canvas></div>
-      </div>
+    <section class="charts-grid enter">
+      <section class="card panel category-card" aria-labelledby="categoryTitle">
+        <div class="panel-head"><h2 id="categoryTitle">Distribución de gastos</h2><small id="catCount"></small></div>
+        <div id="chartDonut"></div>
+      </section>
+      <section class="card panel history-card" aria-labelledby="historyTitle">
+        <div class="panel-head">
+          <div><h2 id="historyTitle">Ingresos y gastos</h2><small id="histCount"></small></div>
+          <div class="chart-key"><span><i></i>Ingresos</span><span><i class="expense-key"></i>Gastos</span></div>
+        </div>
+        <div id="chartBar"></div>
+      </section>
     </section>
 
-    <!-- Transacciones -->
-    <section class="card tx-card">
-      <div class="tx-head">
-        <h3>Transacciones</h3>
-        <span class="tx-count mono" id="txCount"></span>
-      </div>
-      <div id="txList" class="tx-list"></div>
-      <div class="tx-pager">
-        <button class="pager-btn" id="txPrev">‹ Anterior</button>
-        <span class="mono" id="txPagina">1 / 1</span>
-        <button class="pager-btn" id="txNext">Siguiente ›</button>
-      </div>
-    </section>
+    <div class="bottom-grid enter">
+      <!-- Transacciones -->
+      <section class="card panel tx-card" id="transacciones" aria-labelledby="txTitle">
+        <div class="panel-head"><h2 id="txTitle">Transacciones del mes</h2><span class="count mono" id="txCount"></span></div>
+        <div class="tx-columns" aria-hidden="true"><span>Fecha</span><span>Categoría</span><span>Descripción</span><span class="col-monto">Monto</span><span></span></div>
+        <div id="txList" class="tx-list"></div>
+        <div class="tx-pager">
+          <button class="pager-btn" id="txPrev">‹ Anterior</button>
+          <span class="mono" id="txPagina">1 / 1</span>
+          <button class="pager-btn" id="txNext">Siguiente ›</button>
+        </div>
+      </section>
 
-    <!-- Metas -->
-    <section class="card metas-card">
-      <div class="metas-head">
-        <h3>Metas de ahorro</h3>
-        <button class="btn-meta-add" id="btnAddMeta" type="button">+ Meta</button>
-      </div>
-      <div id="metasList"></div>
-    </section>
+      <!-- Metas -->
+      <section class="card panel metas-card" id="metas" aria-labelledby="metasTitle">
+        <div class="panel-head"><h2 id="metasTitle">Metas de ahorro</h2><button class="primary btn-meta-add" id="btnAddMeta" type="button"><span data-icon="plus"></span>Meta</button></div>
+        <div id="metasList"></div>
+      </section>
+    </div>
 
   </main>
 
@@ -142,20 +145,18 @@
     <div class="cfg-card">
       <button class="cfg-x" id="metaClose" type="button" aria-label="Cerrar" title="Cerrar">✕</button>
       <h2 id="metaTitle">Nueva meta</h2>
-      <label>Nombre de la meta</label>
+      <label for="metaNombre">Nombre de la meta</label>
       <input type="text" id="metaNombre" class="inp" placeholder="Ej. Laptop Legion Pro" autocomplete="off">
-      <label>Objetivo (S/)</label>
+      <label for="metaObjetivo">Objetivo (S/)</label>
       <input type="text" id="metaObjetivo" class="inp mono" inputmode="decimal" placeholder="3500" autocomplete="off">
-      <label>Ahorrado hasta ahora (S/)</label>
+      <label for="metaActual">Ahorrado hasta ahora (S/)</label>
       <input type="text" id="metaActual" class="inp mono" inputmode="decimal" placeholder="0" autocomplete="off">
       <button class="btn-primary" id="metaGuardar" type="button">Guardar meta</button>
-      <button class="meta-eliminar" id="metaEliminar" type="button" hidden>🗑 Eliminar meta</button>
+      <button class="meta-eliminar" id="metaEliminar" type="button" hidden>Eliminar meta</button>
       <p class="cfg-estado" id="metaEstado"></p>
     </div>
   </div>
 
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
   <script src="js/config.js"></script>
   <script src="js/utils.js"></script>
   <script src="js/sheets.js"></script>

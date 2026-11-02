@@ -14,7 +14,11 @@
   const formTx      = $('#formTx');
   const btnGasto    = $('#btnGasto');
   const btnIngreso  = $('#btnIngreso');
-  const thumb       = $('#toggleThumb');
+  const toggleBox   = $('#typeToggle');
+  const catWrap     = $('#catWrap');
+  const otraWrap    = $('#otraWrap');
+  const fechaWrap   = $('#fechaWrap');
+  const btnRegTxt   = $('#btnRegistrarTxt');
   const selCategoria = $('#selCategoria');
   const inpOtraCategoria = $('#inpOtraCategoria');
   const inpMonto    = $('#inpMonto');
@@ -38,26 +42,37 @@
   // ------------------------------------------------------------
   function poblarCategorias() {
     const cats = categoriasPorTipo(tipoActual);
-    selCategoria.innerHTML = cats.map(c => {
-      const ic = infoCategoria(c).icon;
-      return `<option value="${c}">${ic}  ${c}</option>`;
-    }).join('');
+    selCategoria.innerHTML = cats.map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join('');
     toggleOtro();
+    actualizarIconoCategoria();
+  }
+
+  // Icono + color de la categoría elegida (junto al desplegable)
+  function actualizarIconoCategoria() {
+    const info = infoCategoria(selCategoria.value);
+    catWrap.style.setProperty('--c', info.color);
+    const svg = catWrap.querySelector('svg');
+    if (svg) svg.outerHTML = iconoCategoria(selCategoria.value);
   }
 
   // Muestra un campo para escribir la categoría cuando se elige "Otro".
   function toggleOtro() {
     const esOtro = selCategoria.value === 'Otro';
-    inpOtraCategoria.hidden = !esOtro;
+    otraWrap.hidden = !esOtro;
     if (!esOtro) inpOtraCategoria.value = '';
   }
-  selCategoria.addEventListener('change', toggleOtro);
+  selCategoria.addEventListener('change', () => { toggleOtro(); actualizarIconoCategoria(); });
 
   function setTipo(tipo) {
     tipoActual = tipo;
     btnGasto.classList.toggle('active', tipo === 'gasto');
     btnIngreso.classList.toggle('active', tipo === 'ingreso');
-    thumb.classList.toggle('ingreso', tipo === 'ingreso');
+    btnGasto.setAttribute('aria-pressed', String(tipo === 'gasto'));
+    btnIngreso.setAttribute('aria-pressed', String(tipo === 'ingreso'));
+    toggleBox.dataset.kind = tipo;                       // el selector se desliza por CSS
+    formTx.classList.toggle('income-form', tipo === 'ingreso');
+    btnRegTxt.textContent = 'Registrar ' + tipo;
+    inpDescripcion.placeholder = tipo === 'gasto' ? 'Ej. Almuerzo en la U' : 'Ej. Entrega de modelado BIM';
     poblarCategorias();
   }
 
@@ -81,7 +96,7 @@
   document.querySelectorAll('input[name="modoFecha"]').forEach(r => {
     r.addEventListener('change', () => {
       const otra = document.querySelector('input[name="modoFecha"]:checked').value === 'otra';
-      inpFecha.hidden = !otra;
+      fechaWrap.hidden = !otra;
       if (otra && !inpFecha.value) inpFecha.value = fechaISO();
     });
   });
@@ -172,7 +187,7 @@
     inpDescripcion.value = '';
     inpOtraCategoria.value = '';
     document.querySelector('input[name="modoFecha"][value="hoy"]').checked = true;
-    inpFecha.hidden = true;
+    fechaWrap.hidden = true;
     inpMonto.focus();
   }
 
@@ -222,6 +237,8 @@
   // Init
   // ------------------------------------------------------------
   function init() {
+    const hoy = new Date();
+    $('#lblHoy').textContent = 'Hoy, ' + hoy.getDate() + ' ' + MESES_ES[hoy.getMonth()].slice(0, 3).toLowerCase() + '.';
     setTipo('gasto');
     refrescarColaBadge();
     if (!Conexion.configurada()) abrirConfig();
@@ -234,9 +251,6 @@
       CacheDash.precargar(mes, mesesAnteriores(mes, 3).join(','));
     }
 
-    if (window.gsap) {
-      gsap.from('.form-card', { opacity: 0, y: 30, duration: 0.4, ease: 'power2.out' });
-    }
   }
   init();
 })();

@@ -1,147 +1,76 @@
 /* ============================================================
-   FM_FINANCE — form.css  (mobile-first, uso a una mano)
+   FM_FINANCE — form.css  ("Pulso" · móvil primero, a una mano)
+   La ✕ vive en su PROPIA fila (.form-card-head), en flujo normal:
+   sin position:absolute ni márgenes negativos → nunca se solapa
+   con el toggle Gasto/Ingreso.
    ============================================================ */
 
-.form-wrap {
-  max-width: 480px;
-  margin: 0 auto;
-  padding: 16px;
+.form-wrap { max-width: 680px; margin: 20px auto 24px; padding: 0 16px; }
+.form-card {
+  padding: 22px 18px 20px; overflow: clip;
+  background: radial-gradient(ellipse at 95% 0, rgba(0,71,106,.14), transparent 48%), linear-gradient(135deg, #0e192b, #0c1123 70%);
+  border-color: #00b5d4;
 }
+.form-back { display: flex; align-items: center; gap: 9px; color: #c3cce4; font-size: 13px; min-height: 44px; width: fit-content; margin-bottom: 6px; }
+.form-back .icon { width: 20px; height: 20px; }
+.form-card-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 18px; }
+.form-card-head h1 { font-size: 26px; line-height: 1.2; letter-spacing: -.04em; }
+.form-close { border-color: #354261; background: #131c31; }
 
-/* ---------- Header ---------- */
-.app-header {
-  position: sticky; top: 0; z-index: 10;
-  height: 52px;
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 0 16px;
-  background: rgba(8,8,15,0.85);
-  backdrop-filter: blur(12px);
-  border-bottom: 1px solid var(--border);
-}
-.brand { display: flex; align-items: center; gap: 8px; }
-.brand .logo {
-  font-weight: 700; font-size: 18px;
-  background: linear-gradient(135deg, var(--accent-cyan), var(--accent-indigo));
-  -webkit-background-clip: text; background-clip: text; color: transparent;
-}
-.brand .title { font-weight: 500; color: var(--text-secondary); font-size: 15px; }
-.header-right { display: flex; align-items: center; gap: 10px; }
-.icon-btn {
-  width: 34px; height: 34px; display: grid; place-items: center;
-  border-radius: var(--radius-sm); background: var(--bg-card);
-  border: 1px solid var(--border); color: var(--text-primary);
-  font-size: 15px; text-decoration: none; transition: border-color .2s, background .2s;
-}
-.icon-btn:hover { border-color: var(--border-hover); background: var(--bg-card-hover); }
-
-/* ---------- Form card ---------- */
-.form-card { padding: 20px; margin-top: 16px; display: flex; flex-direction: column; gap: 6px; }
-
-/* Fila propia para el botón cerrar, en el FLUJO normal (no absolute,
-   SIN márgenes negativos) — así nunca se superpone con nada de abajo. */
-.form-card-head { display: flex; justify-content: flex-end; margin-bottom: 10px; }
-.cfg-x-inline { position: static; } /* anula el position:absolute de .cfg-x */
-
-.field-label {
-  font-family: var(--font-mono); font-size: 12px; color: var(--text-secondary);
-  text-transform: uppercase; letter-spacing: 0.06em; margin-top: 12px; margin-bottom: 4px;
-}
-.field-label .opt { text-transform: none; color: var(--text-muted); letter-spacing: 0; }
-
-.inp {
-  width: 100%; padding: 13px 14px;
-  background: var(--bg-secondary); border: 1px solid var(--border);
-  border-radius: var(--radius-md); color: var(--text-primary); font-size: 15px;
-  transition: border-color .2s, box-shadow .2s;
-}
-.inp:focus { outline: none; border-color: var(--accent-cyan); box-shadow: var(--glow-cyan); }
-textarea.inp { resize: vertical; min-height: 48px; }
-select.inp { appearance: none; cursor: pointer; }
-
-/* ---------- Toggle Ingreso/Gasto ---------- */
-.toggle {
-  position: relative; display: grid; grid-template-columns: 1fr 1fr;
-  background: var(--bg-secondary); border: 1px solid var(--border);
-  border-radius: var(--radius-md); padding: 4px; margin-bottom: 4px;
-}
-.toggle-btn {
-  position: relative; z-index: 2; background: transparent; color: var(--text-secondary);
-  padding: 12px 0; font-weight: 700; font-size: 14px; letter-spacing: 0.04em;
-  transition: color .25s;
-}
-.toggle-btn.active { color: var(--bg-primary); }
+/* Toggle Gasto / Ingreso (el selector se desliza) */
+.type-toggle { position: relative; isolation: isolate; display: grid; grid-template-columns: 1fr 1fr; background: #0c1529; border: 1px solid #334669; border-radius: 11px; padding: 4px; gap: 4px; margin-bottom: 22px; }
+.type-toggle button { min-height: 49px; border: 1px solid transparent; border-radius: 8px; background: transparent; color: #c6d5eb; font-size: 15px; }
+.type-toggle button:hover:not(:disabled) { background: transparent; }
+.type-toggle button.active { color: #230b1a; font-weight: 600; }
+.type-toggle[data-kind="ingreso"] button.active { color: #002e25; }
+.type-toggle .icon { width: 22px; height: 22px; }
 .toggle-thumb {
-  position: absolute; z-index: 1; top: 4px; bottom: 4px; left: 4px;
-  width: calc(50% - 4px); border-radius: 9px;
-  background: var(--accent-pink); box-shadow: var(--glow-pink);
-  transition: transform .28s cubic-bezier(.4,0,.2,1), background .28s, box-shadow .28s;
+  position: absolute; z-index: -1; top: 4px; bottom: 4px; left: 4px; width: calc((100% - 12px) / 2);
+  border: 1px solid #ff95c0; border-radius: 8px; background: linear-gradient(100deg, #ff5aa0, #ff7db8);
+  transition: transform 230ms cubic-bezier(.2,.8,.2,1), background .2s, border-color .2s;
 }
-.toggle-thumb.ingreso { transform: translateX(100%); background: var(--accent-cyan); box-shadow: var(--glow-cyan); }
+.type-toggle[data-kind="ingreso"] .toggle-thumb { transform: translateX(calc(100% + 4px)); background: linear-gradient(100deg, #00dcae, #62ffc2); border-color: #80ffd3; }
 
-/* ---------- Monto ---------- */
-.monto-box {
-  display: flex; align-items: center; gap: 8px;
-  background: var(--bg-secondary); border: 1px solid var(--border);
-  border-radius: var(--radius-md); padding: 8px 14px;
-  transition: border-color .2s, box-shadow .2s;
-}
-.monto-box.focus { border-color: var(--accent-cyan); box-shadow: var(--glow-cyan); }
-.monto-box .moneda { font-family: var(--font-mono); color: var(--text-secondary); font-size: 22px; }
-.monto-input {
-  flex: 1; background: transparent; border: none; outline: none;
-  font-size: 32px; font-weight: 700; color: var(--text-primary);
-}
-.monto-input::placeholder { color: var(--text-muted); }
+.field-group { margin-top: 22px; }
+.field-label { display: block; color: #e6ebff; font-weight: 500; font-size: 14px; margin-bottom: 10px; }
+.field-label span { color: #b3bed9; font-size: 12px; font-weight: 400; }
+.field-hint { color: var(--text-secondary); font-size: 11px; margin-top: 8px; }
 
-/* ---------- Fecha ---------- */
-.fecha-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.radio-pill {
-  display: inline-flex; align-items: center; gap: 6px;
-  padding: 9px 14px; border-radius: 999px; cursor: pointer;
-  background: var(--bg-secondary); border: 1px solid var(--border);
-  font-size: 14px; color: var(--text-secondary); transition: all .2s;
-}
-.radio-pill:has(input:checked) { border-color: var(--accent-indigo); color: var(--text-primary); background: var(--bg-card-hover); }
-.radio-pill input { accent-color: var(--accent-indigo); }
-.inp-fecha { flex-basis: 100%; }
+.amount-field { display: flex; align-items: center; gap: 14px; border: 1px solid var(--accent-pink); padding: 6px 18px; border-radius: 11px; background: #10162b; }
+.amount-field:focus-within { box-shadow: 0 0 0 3px rgba(255,107,157,.12); }
+.income-form .amount-field { border-color: var(--accent-green); }
+.income-form .amount-field:focus-within { box-shadow: 0 0 0 3px rgba(0,255,176,.12); }
+.amount-field > span { font: 400 24px var(--font-mono); color: #c1cbe8; }
+.amount-field input { border: 0; background: transparent; border-radius: 0; padding: 4px 0; font: 500 38px/1.4 var(--font-mono); letter-spacing: -.06em; height: 66px; box-shadow: none; }
+.amount-field input:focus { box-shadow: none; }
 
-/* ---------- Botón registrar ---------- */
-.btn-registrar {
-  margin-top: 22px; width: 100%; height: 56px;
-  border-radius: var(--radius-md); font-size: 17px; font-weight: 700; letter-spacing: 0.04em;
-  color: #fff; background: linear-gradient(135deg, var(--accent-indigo), #5a4ee0);
-  box-shadow: var(--glow-indigo); transition: transform .12s, opacity .2s;
-}
-.btn-registrar:active { transform: scale(0.98); }
-.btn-registrar:disabled { opacity: .55; cursor: not-allowed; }
+.category-select-wrap { display: flex; align-items: center; gap: 14px; border: 1px solid #495676; border-radius: 11px; padding-left: 16px; background: var(--bg-secondary); }
+.category-select-wrap:focus-within { border-color: var(--accent-cyan); box-shadow: var(--glow-cyan); }
+.category-select-wrap > .icon { color: var(--c, #b2b7d1); width: 25px; height: 25px; }
+.category-select-wrap select { border: 0; background: transparent; padding-left: 0; box-shadow: none; min-height: 54px; }
+.category-select-wrap select:focus { box-shadow: none; }
+.conditional { margin-top: 12px; }
 
-/* ---------- Cola offline ---------- */
-.cola-badge {
-  margin: 14px auto 0; width: fit-content;
-  font-family: var(--font-mono); font-size: 13px; color: var(--accent-amber);
-  background: rgba(255,184,0,0.08); border: 1px solid rgba(255,184,0,0.3);
-  padding: 6px 14px; border-radius: 999px;
-}
+.date-fieldset { border: 0; padding: 0; min-width: 0; }
+.date-choices { display: flex; gap: 12px; flex-wrap: wrap; }
+.date-choice { display: flex; gap: 10px; align-items: center; border: 1px solid #495676; border-radius: 11px; padding: 12px 14px; min-height: 52px; flex: 1 1 140px; cursor: pointer; font-size: 13px; background: var(--bg-secondary); }
+.date-choice:has(:checked) { border-color: var(--accent-pink); background: rgba(255,107,157,.04); }
+.income-form .date-choice:has(:checked) { border-color: var(--accent-green); }
+.date-choice input { width: 17px; min-height: 17px; padding: 0; margin: 0; accent-color: var(--accent-pink); flex-shrink: 0; }
+.income-form .date-choice input { accent-color: var(--accent-green); }
+.date-choice .icon { width: 20px; height: 20px; color: #c4cce5; }
+.date-choice:has(:checked) .icon { color: var(--accent-pink); }
+.income-form .date-choice:has(:checked) .icon { color: var(--accent-green); }
 
-/* ---------- Overlay configuración ---------- */
-.cfg-overlay {
-  position: fixed; inset: 0; z-index: 100;
-  background: rgba(8,8,15,0.92); backdrop-filter: blur(6px);
-  display: grid; place-items: center; padding: 20px;
+.submit-button { width: 100%; min-height: 58px; margin-top: 28px; border-radius: 11px; font-size: 16px; }
+.income-form .submit-button { background: linear-gradient(100deg, #00dcae, #62ffc2); border-color: #80ffd3; color: #002e25; }
+
+/* Cola offline */
+.cola-badge { margin: 16px auto 0; width: fit-content; font-family: var(--font-mono); font-size: 13px; color: var(--accent-amber); background: rgba(255,184,0,.08); border: 1px solid rgba(255,184,0,.3); padding: 6px 14px; border-radius: 999px; }
+
+@media (min-width: 700px) {
+  .form-wrap { margin: 36px auto 42px; }
+  .form-card { padding: 30px 32px 25px; }
+  .form-card-head h1 { font-size: 30px; }
+  .amount-field input { font-size: 42px; height: 74px; }
 }
-.cfg-card {
-  width: 100%; max-width: 420px; background: var(--bg-card);
-  border: 1px solid var(--border); border-radius: var(--radius-lg);
-  padding: 24px; display: flex; flex-direction: column; gap: 8px;
-}
-.cfg-card h2 { font-size: 20px; }
-.cfg-help { color: var(--text-secondary); font-size: 14px; margin-bottom: 8px; line-height: 1.5; }
-.cfg-card label { font-family: var(--font-mono); font-size: 12px; color: var(--text-secondary); margin-top: 8px; }
-.btn-primary {
-  margin-top: 16px; height: 48px; border-radius: var(--radius-md);
-  font-weight: 700; color: #fff; background: linear-gradient(135deg, var(--accent-cyan), var(--accent-indigo));
-}
-.btn-primary:disabled { opacity: .55; }
-.cfg-estado { font-family: var(--font-mono); font-size: 13px; min-height: 18px; margin-top: 8px; }
-.cfg-estado.ok { color: var(--accent-green); }
-.cfg-estado.error { color: var(--accent-red); }

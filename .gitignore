@@ -9,3 +9,10 @@ desktop.ini
 
 # Respaldos con datos financieros reales — NUNCA al repo publico
 backups/
+
+# Brief interno para otras herramientas (sin secretos, pero no hace falta publicarlo)
+CODEX_HANDOFF.md
+
+# Exploraciones de diseno de Codex (PNG/prompts pesados): solo locales
+prototypes/
+AGENTS.md
