@@ -213,4 +213,50 @@ function fechaCorta(yyyymmdd) {
   return `${d}-${MESES_ES[Number(m) - 1].slice(0, 3).toLowerCase()}`;
 }
 
+/* ---------- Líneas de contorno decorativas (SVG generado, 0 KB extra) ---------- */
+function contornos(cls) {
+  let d = '';
+  for (let i = 0; i < 12; i++) {
+    d += `<path d="M -20 ${120 + i * 12} C 120 ${300 + i * 12} 240 ${300 + i * 12} 340 ${140 + i * 12} S 540 ${-20 + i * 12} 640 ${120 + i * 12}" stroke="currentColor" stroke-width="1"/>`;
+  }
+  return `<svg class="${cls}" viewBox="0 0 600 360" fill="none" aria-hidden="true">${d}</svg>`;
+}
+function hidratarContornos() {
+  document.querySelectorAll('[data-contours]').forEach((el) => {
+    el.insertAdjacentHTML('afterend', contornos(el.dataset.contours));
+    el.remove();
+  });
+}
+
+/* ---------- Movimiento de la aurora ----------
+   Se pausa: con el botón del pie (se recuerda en este dispositivo), cuando
+   la pestaña está oculta (no gasta batería en segundo plano) y con
+   "reducir movimiento" del sistema (la textura se queda, quieta). */
+const Movimiento = {
+  KEY: 'fm_aurora_pausada',
+  reducido: window.matchMedia('(prefers-reduced-motion: reduce)'),
+  pausadoPorUsuario() { try { return localStorage.getItem(this.KEY) === '1'; } catch (e) { return false; } },
+  sync() {
+    const pausado = this.pausadoPorUsuario();
+    document.body.classList.toggle('motion-paused', pausado || document.hidden);
+    const b = document.getElementById('motionToggle');
+    if (!b) return;
+    b.disabled = this.reducido.matches;
+    b.setAttribute('aria-pressed', String(pausado));
+    b.textContent = this.reducido.matches ? 'Movimiento reducido' : pausado ? 'Reanudar aurora' : 'Pausar aurora';
+  },
+  init() {
+    const b = document.getElementById('motionToggle');
+    if (b) b.addEventListener('click', () => {
+      try { localStorage.setItem(this.KEY, this.pausadoPorUsuario() ? '0' : '1'); } catch (e) { /* sin storage: no se recuerda */ }
+      this.sync();
+    });
+    document.addEventListener('visibilitychange', () => this.sync());
+    if (this.reducido.addEventListener) this.reducido.addEventListener('change', () => this.sync());
+    this.sync();
+  },
+};
+
 hidratarIconos();
+hidratarContornos();
+Movimiento.init();

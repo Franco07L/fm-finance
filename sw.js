@@ -6,7 +6,7 @@
    - Sube CACHE_VERSION cuando cambies archivos para forzar refresco.
    ============================================================ */
 
-const CACHE_VERSION = 'fm-finance-v19';
+const CACHE_VERSION = 'fm-finance-v20';
 
 const APP_SHELL = [
   './',
@@ -22,6 +22,7 @@ const APP_SHELL = [
   './js/charts.js',
   './js/form.js',
   './js/dashboard.js',
+  './img/aurora.webp',
   './icons/icon-192.png',
   './icons/icon-512.png',
 ];

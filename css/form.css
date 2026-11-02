@@ -11,6 +11,7 @@
   background: radial-gradient(ellipse at 95% 0, rgba(0,71,106,.14), transparent 48%), linear-gradient(135deg, #0e192b, #0c1123 70%);
   border-color: #00b5d4;
 }
+.form-card > :not(.form-contours) { position: relative; }   /* el contenido va encima de las líneas */
 .form-back { display: flex; align-items: center; gap: 9px; color: #c3cce4; font-size: 13px; min-height: 44px; width: fit-content; margin-bottom: 6px; }
 .form-back .icon { width: 20px; height: 20px; }
 .form-card-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 18px; }

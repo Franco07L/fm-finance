@@ -15,6 +15,7 @@
   <link rel="stylesheet" href="css/dashboard.css">
 </head>
 <body>
+  <div class="aurora" aria-hidden="true"></div>
 
   <!-- Overlay de configuración (igual que el form) -->
   <div class="cfg-overlay" id="cfgOverlay" hidden>
@@ -57,6 +58,7 @@
     <!-- Saldo total (persistente, no depende del mes) + disponible por día -->
     <section class="hero-grid enter" aria-label="Saldo y presupuesto diario">
       <article class="card hero balance-card">
+        <span data-contours="contours"></span>
         <div class="hero-label"><span data-icon="coins"></span><span>Saldo total</span></div>
         <div class="balance-value" id="saldoTotalVal">S/ 0</div>
         <p class="hero-note">Todo tu historial · no cambia al navegar entre meses</p>
@@ -137,6 +139,11 @@
     </div>
 
   </main>
+
+  <footer class="app-footer">
+    <span class="footer-sign"><i></i> FM FINANCE <span class="sep">/</span> PULSO</span>
+    <button type="button" id="motionToggle" class="motion-toggle" aria-pressed="false">Pausar aurora</button>
+  </footer>
 
   <div class="loading-overlay" id="loading" hidden><div class="spinner"></div></div>
 

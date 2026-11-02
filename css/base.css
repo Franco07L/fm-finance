@@ -56,24 +56,52 @@ html, body {
   -webkit-font-smoothing: antialiased;
   min-height: 100vh;
 }
-body { position: relative; isolation: isolate; padding-bottom: 120px; min-width: 320px; }
+body { position: relative; isolation: isolate; padding-bottom: 0; min-width: 320px; min-height: 100vh; }
 
-/* ---------- Aurora (solo gradientes, una capa, solo transform) ---------- */
-body::before {
-  content: ''; position: fixed; inset: -4%; z-index: -1; pointer-events: none;
-  background:
-    radial-gradient(62% 40% at 6% 102%,  rgba(0,212,255,.34),  transparent 70%),
-    radial-gradient(56% 44% at 94% 100%, rgba(155,134,255,.36), transparent 70%),
-    radial-gradient(46% 26% at 52% 106%, rgba(0,255,176,.20),  transparent 72%),
-    radial-gradient(40% 30% at 0% 36%,   rgba(0,212,255,.10),  transparent 70%),
-    radial-gradient(38% 26% at 100% 12%, rgba(155,134,255,.10), transparent 70%);
-  will-change: transform;
-  animation: aurora 28s ease-in-out infinite alternate;
+/* ---------- Aurora "Pulso" (textura de Codex, WebP de 35 KB) ----------
+   Dos capas de la misma imagen: una arriba (tenue) y otra abajo (intensa),
+   que se desplazan muy lento (24 s / 28 s). Solo se anima transform, así
+   que corre en la GPU sin repintar. Se pausa con el botón del pie, cuando
+   la pestaña no se ve, y no se mueve con "reducir movimiento". */
+.aurora {
+  position: absolute; inset: 0; z-index: -1; pointer-events: none; overflow: hidden;
+  background: radial-gradient(ellipse at 0 44%, rgba(9,38,69,.27), transparent 70%), #040813;
 }
-@keyframes aurora {
-  from { transform: translate3d(-1.5%, 0, 0) scale(1.02); }
-  to   { transform: translate3d(1.5%, -1.5%, 0) scale(1.06); }
+.aurora::before, .aurora::after {
+  content: ''; position: absolute; width: 108%; left: -4%;
+  background-image: url("../img/aurora.webp"); background-repeat: no-repeat; background-size: cover;
+  transform-origin: 50% 70%; will-change: transform;
 }
+.aurora::before {
+  top: -250px; height: clamp(600px, 73vw, 1100px); background-position: center top; opacity: .55;
+  -webkit-mask-image: linear-gradient(#000 45%, transparent 100%); mask-image: linear-gradient(#000 45%, transparent 100%);
+  animation: aurora-drift-upper 24s ease-in-out infinite alternate;
+}
+.aurora::after {
+  bottom: -22px; height: clamp(720px, 74vw, 1150px); background-position: center bottom; opacity: .96;
+  -webkit-mask-image: linear-gradient(transparent, #000 30%); mask-image: linear-gradient(transparent, #000 30%);
+  animation: aurora-drift-lower 28s ease-in-out infinite alternate;
+}
+.motion-paused .aurora::before, .motion-paused .aurora::after { animation-play-state: paused; }
+@keyframes aurora-drift-upper { from { transform: translate3d(-1%,0,0) scale(1); } to { transform: translate3d(1%,16px,0) scale(1.025); } }
+@keyframes aurora-drift-lower { from { transform: translate3d(1%,0,0) scale(1); } to { transform: translate3d(-1%,-15px,0) scale(1.025); } }
+@media (max-width: 600px) {
+  .aurora::before { top: -130px; height: 650px; opacity: .65; background-position: 62% top; }
+  .aurora::after { height: 800px; background-position: 46% bottom; }
+}
+
+/* Líneas de contorno decorativas (tarjeta de saldo y formulario) */
+.contours { position: absolute; width: 78%; height: 170%; right: -12%; bottom: -45%; color: #00ffd9; opacity: .16; pointer-events: none; }
+.form-contours { position: absolute; pointer-events: none; width: 60%; height: 320px; right: -16%; top: -12%; color: var(--accent-cyan); opacity: .12; }
+
+/* Pie: firma + pausa de la aurora (deja ver la aurora inferior) */
+.app-footer { max-width: 1512px; margin: 18px auto 0; padding: 0 36px 175px; display: flex; align-items: center; justify-content: space-between; gap: 16px; font-size: 11px; color: #b1b9d3; }
+.footer-sign { font-size: 10px; letter-spacing: 1.5px; display: flex; align-items: center; gap: 8px; white-space: nowrap; }
+.footer-sign i { width: 5px; height: 5px; background: var(--accent-cyan); border-radius: 50%; box-shadow: 0 0 7px rgba(0,212,255,.5); }
+.footer-sign .sep { color: var(--accent-indigo); padding: 0 4px; }
+.motion-toggle { min-height: 44px; font-size: 11px; background: rgba(12,18,33,.48); color: #c2cbe5; border-color: #354363; padding: 7px 14px; }
+.motion-toggle:disabled { opacity: 1; color: #acb9d4; }
+@media (max-width: 600px) { .app-footer { padding: 0 18px 140px; flex-direction: column; align-items: flex-start; gap: 10px; } }
 
 h1, h2, h3, h4 { font-weight: 600; letter-spacing: -.03em; }
 h2 { font-size: 18px; line-height: 1.4; }
@@ -195,6 +223,9 @@ input:focus, select:focus, textarea:focus { outline: 0; border-color: var(--acce
 
 /* ---------- Entrada suave de paneles (una vez, 230 ms) ---------- */
 .enter { animation: enter 230ms cubic-bezier(.2,.8,.2,1) both; }
+.metrics.enter { animation-delay: 25ms; }
+.charts-grid.enter { animation-delay: 45ms; }
+.bottom-grid.enter { animation-delay: 65ms; }
 @keyframes enter { from { opacity: 0; transform: translateY(9px); } to { opacity: 1; transform: none; } }
 
 /* Scrollbar */
@@ -204,6 +235,6 @@ input:focus, select:focus, textarea:focus { outline: 0; border-color: var(--acce
 
 /* Accesibilidad: sin movimiento si el usuario lo pide */
 @media (prefers-reduced-motion: reduce) {
-  body::before { animation: none; }
+  .aurora::before, .aurora::after { animation: none !important; }   /* la textura se queda, quieta */
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
 }

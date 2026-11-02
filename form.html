@@ -15,6 +15,7 @@
   <link rel="stylesheet" href="css/form.css">
 </head>
 <body>
+  <div class="aurora" aria-hidden="true"></div>
 
   <!-- Overlay de configuración (se muestra si no hay URL+token guardados) -->
   <div class="cfg-overlay" id="cfgOverlay" hidden>
@@ -48,6 +49,7 @@
 
   <main class="form-wrap enter">
     <form class="card form-card" id="formTx" autocomplete="off" novalidate>
+      <span data-contours="form-contours"></span>
       <a href="index.html" class="form-back"><span data-icon="arrowLeft"></span>Volver al inicio</a>
 
       <!-- La ✕ en su PROPIA fila, en flujo normal: nunca se solapa con el toggle -->
@@ -108,6 +110,11 @@
     <!-- Badge de pendientes offline -->
     <div class="cola-badge" id="colaBadge" hidden>📶 <span id="colaCount">0</span> pendiente(s)</div>
   </main>
+
+  <footer class="app-footer">
+    <span class="footer-sign"><i></i> FM FINANCE <span class="sep">/</span> PULSO</span>
+    <button type="button" id="motionToggle" class="motion-toggle" aria-pressed="false">Pausar aurora</button>
+  </footer>
 
   <script src="js/config.js"></script>
   <script src="js/utils.js"></script>
